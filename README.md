@@ -1,0 +1,63 @@
+# Schülerzeitung · Redaktions-PC (Beispiel: Sitzung 1)
+
+Lernapp zum Projekt Schülerzeitung: Die SuS arbeiten an einem **virtuellen PC** (Desktop, Startmenü, Taskleiste, Fenster) mit **Datei-Explorer** und **Word**. Jede Sitzung hat ein Thema, einen Ordner und einen Artikel. Dazu kommen Windows-Aufgaben am eigenen, wachsenden Bestand.
+
+Diese Version enthält **Sitzung 1 „Eine Meldung aus meiner Stadt“** vollständig. Sie hat 16 Aufgaben in 3 Teilen und eine Bonusaufgabe und dauert ca. 80–90 Minuten. Der Artikel muss mindestens 30 Zeilen lang sein. Die Sitzungen 2–9 sind im Redaktionsplan sichtbar und werden nach demselben Muster ergänzt (Datei `sitzungen.js`).
+
+## Für die SuS
+1. Profil anlegen (Name, Klasse, **PIN**). Mehrere Personen können denselben Laptop nutzen.
+2. Sitzung öffnen: Links stehen Redaktionsauftrag und Aufgaben. Erledigte Aufgaben werden automatisch abgehakt.
+3. **Sitzung beenden** → Auswertung ansehen → Anleitung zur Abgabe befolgen:
+   - am echten Computer den Ordner *Dokumente › Schülerzeitung_Berichte* anlegen,
+   - den **Sitzungsbericht (PDF)** herunterladen und dorthin verschieben,
+   - per **E-Mail** an den Dozenten schicken.
+4. An einem anderen Laptop: Startseite → **Stand aus Bericht laden (PDF)** → PIN → weiterarbeiten. Im PDF steckt eine signierte Sicherung des ganzen Stands.
+
+## Was die App kontrolliert
+- **Länge des Artikels:** Word zeigt in der Statusleiste Wörter und Zeilen. Gezählt werden Zeilen mit Text, so wie sie auf der Word-Seite umbrechen; leere Zeilen zählen nicht. Wer Word vorher schließen oder die Sitzung beenden will, bekommt die Meldung „Dein Text ist noch nicht lang genug“ (mit „Weiterschreiben“ oder „Trotzdem schließen“).
+- **Hinweise bei offenen Aufgaben:** Liegt ein Ordner oder eine Datei an der falschen Stelle oder ist sie anders geschrieben, steht unter der Aufgabe, wo sie gefunden wurde und was zu tun ist. Groß-/Kleinschreibung zählt wie bei Windows nicht.
+- **Rechtschreibung und Grammatik wie in Word:**
+  - Rot gewellt markiert sind Rechtschreibfehler.
+  - Blau doppelt unterstrichen sind Grammatik und Zeichensetzung.
+  - Ein Rechtsklick auf die Markierung zeigt Vorschläge, „Alle ignorieren“ und „Zum Wörterbuch hinzufügen“.
+  - F7 bzw. *Überprüfen › Rechtschreibung und Grammatik* springt zum nächsten Fehler.
+  - Die Prüfung läuft komplett offline: Hunspell mit deutschem Wörterbuch für die Rechtschreibung (zusammengesetzte Wörter wie „Hüpfburg“ und Zahlwörter werden erkannt), eigene Regeln für die Grammatik. Die Regeln decken typische Fehler ab: Leerzeichen, doppelte Wörter, kleiner Satzanfang, Komma vor *dass/weil/obwohl…*, *das/dass*, *seid/seit* und fehlender Satzpunkt.
+- **Arbeitsweise in Word:** Markieren per Doppelklick, Dreifachklick, Tastatur oder Ziehen; benutzte Tastenkombinationen (auch Strg+S); Befehle über das Menüband.
+- **Nachmachen:** Bei eindeutig umständlicher Arbeitsweise wird die Aktion zurückgenommen und muss effektiv wiederholt werden. Das gilt in diesen Fällen:
+  - 7× Rücktaste/Entf am Stück → Wort per Doppelklick markieren und einmal löschen
+  - ein einzelnes Wort mit der Maus gezogen → Doppelklick
+  - 3× Kopieren/Einfügen über das Menüband → Strg+C / Strg+V
+  - Mit dem **Lehrkraft-Code** (config.js) lässt sich ein Nachmachen freigeben.
+- **Einfügen von außen ist gesperrt.** Das gilt für Strg+V, Rechtsklick, Ziehen und Windows+V, auch in Dateinamen-Feldern. Text, der in der App selbst kopiert wurde, darf eingefügt werden.
+- **Schreibprotokoll:** Es erfasst getippte und gelöschte Zeichen, Zeichen im Artikel, blockierte Einfügeversuche, Wechsel aus der App, die Arbeitszeit und den Tippverlauf pro Minute.
+
+## Note
+Die Note ergibt sich aus dem Anteil der erledigten Aufgaben; die Bonusaufgabe gibt 5 Prozentpunkte dazu. Der Notenschlüssel steht in `config.js` (`NOTEN`, `BONUS_PROZENT`) und kann angepasst werden: ab 92 % → 1, ab 81 % → 2, ab 67 % → 3, ab 50 % → 4, ab 30 % → 5, darunter 6. Die Note steht auf der Auswertung und im PDF-Bericht.
+
+## Den Redaktions-PC auf den eigenen Computer übertragen
+Vor dem Bericht kommt Schritt 1: Alles, was in der App ist, bauen die SuS auf ihrem eigenen Computer nach (unter *Dokumente*, einstellbar mit `EXPORT_ORT`). Sie erstellen alle Ordner selbst und laden jede Datei als echte Word-Datei (.docx) herunter, dann verschieben sie sie aus *Downloads* in den richtigen Ordner. Die App merkt sich über alle Sitzungen, welche Dateien schon übertragen sind; danach sind nur neue oder geänderte Dateien markiert. Vor dem Herunterladen des Berichts erscheint dieser Hinweis noch einmal, und der Bericht zeigt, wie viele Dateien übertragen wurden.
+
+## Der Sitzungsbericht (PDF)
+Der Bericht enthält:
+- Name, Klasse, Datum und Arbeitszeit
+- alle Aufgaben mit + / –
+- den Artikel mit Formatierung (fett, Größe, zentriert) und den verbleibenden Fehlern
+- die Arbeitsweise
+- das Schreibprotokoll mit Diagramm
+- die Ordnerstruktur
+
+Ein Lehrkraft-Bereich ist nicht nötig. Die eingebettete Sicherung ist signiert: Wird sie verändert, lässt sich der Stand nicht mehr laden.
+
+## Einstellungen (`config.js`)
+- `LEHRER_CODE` und `GEHEIMNIS` bitte ändern und nicht weitergeben. `GEHEIMNIS` danach nicht mehr ändern.
+- `DOZENT_MAIL`: Mit einer Adresse ist sie im Mail-Button schon eingetragen.
+- Datenschutz: Die App nutzt keine externen Dienste und überträgt nichts. Profile liegen nur im Browser des Laptops.
+
+## Grenzen der Browser-Simulation
+- Getestet mit Chrome/Edge und Firefox. Beide Browser speichern Formatierungen unterschiedlich; die App gleicht das aus.
+- Windows-Taste, Alt+Tab, Alt+F4 und Strg+W können nicht nachgebildet werden.
+- Wer einen Text vom Bildschirm abtippt, kann nicht gehindert werden. Das Schreibprotokoll macht es aber sichtbar.
+- Die Grammatikprüfung erkennt nur die oben genannten typischen Fehler, nicht alles, was Word findet.
+
+## Dateien (alle flach im Repository)
+`index.html`, `style.css`, `config.js`, `util.js`, `pdf.js`, `hunspell.js`, `woerterbuch-de.js`, `rechtschreibung.js`, `sim-explorer.js`, `sim-dialoge.js`, `sitzungen.js`, `word.js`, `desktop.js`, `auswertung.js`, `bericht.js`, `docx.js`, `app.js`, `LIZENZEN.md`
