@@ -78,14 +78,16 @@ KL.pc = (() => {
     function icons() {
       const liste = [{ id: "pc", name: "Dieser PC", icon: "🖥️" }, { id: "papierkorb", name: "Papierkorb", icon: fs.nodes.papierkorb.kinder.length ? "🗑️" : "🗑️" }]
         .concat(fs.nodes.desktop.kinder.map((id) => fs.nodes[id]).filter(Boolean).map((n) => ({ id: n.id, name: n.name, icon: KL.fs.icon(n) })));
-      iconsEl.innerHTML = liste.map((x) => `<div class="pc-icon${iconSel === x.id ? " sel" : ""}" data-id="${x.id}" title="${esc(x.name)}"><span>${x.icon}</span>${esc(x.name)}</div>`).join("");
+      iconsEl.innerHTML = liste.map((x) => `<div class="pc-icon${iconSel === x.id ? " sel" : ""}${KL.fsAblage && KL.fsAblage.clip && KL.fsAblage.clip.mode === "cut" && KL.fsAblage.clip.ids.includes(x.id) ? " cut" : ""}" data-id="${x.id}" title="${esc(x.name)}"><span>${x.icon}</span>${esc(x.name)}</div>`).join("");
     }
     // Nur Markierung umschalten (kein Neuaufbau – sonst geht der Doppelklick verloren)
     function zeigeIconAuswahl() { iconsEl.querySelectorAll(".pc-icon").forEach((x) => x.classList.toggle("sel", x.dataset.id === iconSel)); }
     iconsEl.addEventListener("click", (e) => {
+      if (e.target.closest(".pc-icon-input")) return;
       const i = e.target.closest(".pc-icon");
       iconSel = i ? i.dataset.id : null;
       zeigeIconAuswahl();
+      pc.focus({ preventScroll: true });
     });
     iconsEl.addEventListener("dblclick", (e) => {
       const i = e.target.closest(".pc-icon");
@@ -96,7 +98,189 @@ KL.pc = (() => {
       if (n.kinder || n.typ === "pc" || n.typ === "papierkorb") oeffneExplorer(n.id);
       else oeffneDatei(n.id);
     });
+    // ---------- Rechtsklick-Menüs und Tastenkürzel auf dem Desktop ----------
+    // wie im echten Windows: Neu › Ordner/Word-Dokument, Ausschneiden, Kopieren,
+    // Einfügen, Löschen, Umbenennen. Die Zwischenablage teilt sich der Desktop
+    // mit dem Datei-Explorer.
+    const ABL = (KL.fsAblage = KL.fsAblage || { clip: null });
+    ABL.clip = null;
+    const UNGUELTIG = /[\\/:*?"<>|]/;
+    const N = (id) => fs.nodes[id];
+    const jetzt = () => { const d = new Date(), p = (x) => String(x).padStart(2, "0"); return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+    const istNachfahre = (id, vorfahre) => { let n = N(id); while (n) { if (n.id === vorfahre) return true; n = N(n.eltern); } return false; };
+    function eindeutigerName(elternId, wunsch, istKopie) {
+      const namen = new Set(N(elternId).kinder.map((id) => N(id) && N(id).name.toLowerCase()));
+      if (!namen.has(wunsch.toLowerCase())) return wunsch;
+      const e = KL.fs.ext(wunsch);
+      const basis = e ? wunsch.slice(0, -(e.length + 1)) : wunsch, endung = e ? "." + e : "";
+      let k, i = 2;
+      if (istKopie) { k = `${basis} - Kopie${endung}`; while (namen.has(k.toLowerCase())) k = `${basis} - Kopie (${i++})${endung}`; return k; }
+      k = `${basis} (2)${endung}`; while (namen.has(k.toLowerCase())) k = `${basis} (${++i})${endung}`;
+      return k;
+    }
+    function tiefeKopie(id, eltern) {
+      const src = N(id), nid = "n" + fs.seq++;
+      const kopie = { ...src, id: nid, eltern };
+      delete kopie.herkunft; delete kopie.fest; delete kopie.geloeschtAm;
+      if (src.kinder) kopie.kinder = [];
+      fs.nodes[nid] = kopie;
+      if (src.kinder) src.kinder.forEach((cid) => kopie.kinder.push(tiefeKopie(cid, nid)));
+      return nid;
+    }
+    const geaendert = (op, x) => { T.explorer(op, { ...x, quelle: "desktop" }); aktualisieren(); ctx.speichereZustand(); };
+    const dOps = {
+      neu(typ) {
+        const id = "n" + fs.seq++;
+        const name = eindeutigerName("desktop", typ === "ordner" ? "Neuer Ordner" : typ === "word" ? "Neues Microsoft Word-Dokument.docx" : "Neues Textdokument.txt");
+        fs.nodes[id] = typ === "ordner" ? { id, name, typ: "ordner", eltern: "desktop", kinder: [], datum: jetzt() }
+          : { id, name, typ: "datei", eltern: "desktop", groesse: 0, datum: jetzt(), ...(typ === "word" ? { inhalt: "" } : {}) };
+        N("desktop").kinder.push(id);
+        iconSel = id;
+        geaendert("neu", { typ, pfad: KL.fs.pfadVon(fs, id) });
+        umbenennen(id);
+      },
+      ablage(mode) {
+        const n = N(iconSel);
+        if (!n || n.fest || !fs.nodes.desktop.kinder.includes(n.id)) return;
+        ABL.clip = { mode, ids: [n.id] };
+        T.explorer(mode === "copy" ? "kopieren" : "ausschneiden", { namen: [n.name], quelle: "desktop" });
+        icons();
+        if (explorer) explorer.comp.render();
+      },
+      einfuegen(ziel) {
+        ziel = ziel || "desktop";
+        if (!ABL.clip || !N(ziel) || !N(ziel).kinder) return;
+        const ids = ABL.clip.ids.filter((id) => N(id) && !istNachfahre(id, "papierkorb"));
+        if (!ids.length) { ABL.clip = null; return; }
+        if (ids.some((id) => istNachfahre(ziel, id))) { meldung("Der Zielordner ist ein Unterordner des Quellordners."); return; }
+        const neu = [];
+        ids.forEach((id) => {
+          if (ABL.clip.mode === "copy") {
+            const nid = tiefeKopie(id, ziel);
+            N(nid).name = eindeutigerName(ziel, N(nid).name, N(id).eltern === ziel);
+            N(ziel).kinder.push(nid); neu.push(nid);
+          } else if (N(id).eltern !== ziel) {
+            const alt = N(N(id).eltern); if (alt) alt.kinder = alt.kinder.filter((x) => x !== id);
+            N(id).name = eindeutigerName(ziel, N(id).name);
+            N(id).eltern = ziel; N(ziel).kinder.push(id); neu.push(id);
+          }
+        });
+        const modus = ABL.clip.mode;
+        if (modus === "cut") ABL.clip = null;
+        geaendert("einfuegen", { modus, ziel: KL.fs.pfadVon(fs, ziel), namen: neu.map((id) => N(id).name) });
+      },
+      loeschen() {
+        const n = N(iconSel);
+        if (!n || n.fest || !fs.nodes.desktop.kinder.includes(n.id)) return;
+        n.herkunft = n.eltern; n.geloeschtAm = jetzt();
+        N("desktop").kinder = N("desktop").kinder.filter((x) => x !== n.id);
+        n.eltern = "papierkorb"; N("papierkorb").kinder.push(n.id);
+        iconSel = null;
+        geaendert("loeschen", { name: n.name });
+      },
+      papierkorbLeeren() {
+        const weg = (id) => { const n = N(id); if (n && n.kinder) n.kinder.forEach(weg); delete fs.nodes[id]; };
+        N("papierkorb").kinder.forEach(weg); N("papierkorb").kinder = [];
+        geaendert("papierkorb-leeren", {});
+      },
+    };
+    function umbenennen(id) {
+      const n = N(id);
+      const el = iconsEl.querySelector(`.pc-icon[data-id="${id}"]`);
+      if (!n || n.fest || !el) return;
+      const ta = document.createElement("textarea");
+      ta.className = "pc-icon-input"; ta.value = n.name; ta.rows = 2; ta.spellcheck = false;
+      el.lastChild.replaceWith(ta);
+      ta.focus();
+      const e = KL.fs.ext(n.name);
+      ta.setSelectionRange(0, !n.kinder && e ? n.name.length - e.length - 1 : n.name.length);
+      let fertig = false;
+      const ende = (ok) => {
+        if (fertig) return; fertig = true;
+        const neu = ta.value.replace(/\n/g, "").trim();
+        if (ok && neu && neu !== n.name) {
+          if (UNGUELTIG.test(neu)) meldung('Ein Dateiname darf keines der folgenden Zeichen enthalten: \\ / : * ? " < > |');
+          else if (N("desktop").kinder.some((cid) => cid !== id && N(cid) && N(cid).name.toLowerCase() === neu.toLowerCase())) meldung(`An diesem Ort ist bereits ein Element mit dem Namen „${neu}“ vorhanden.`);
+          else { const von = n.name; n.name = neu; n.datum = jetzt(); geaendert("umbenennen", { von, zu: neu }); pc.focus(); return; }
+        }
+        icons(); pc.focus();
+      };
+      ta.addEventListener("keydown", (ev) => {
+        ev.stopPropagation();
+        if (ev.key === "Enter") { ev.preventDefault(); ende(true); }
+        if (ev.key === "Escape") { ev.preventDefault(); ende(false); }
+      });
+      ta.addEventListener("blur", () => ende(true));
+      ta.addEventListener("mousedown", (ev) => ev.stopPropagation());
+      ta.addEventListener("dblclick", (ev) => ev.stopPropagation());
+    }
+    let menuEl = null;
+    const menuZu = () => { if (menuEl) { menuEl.remove(); menuEl = null; } };
+    function deskMenu(x, y, items) {
+      menuZu();
+      menuEl = document.createElement("div");
+      menuEl.className = "xp-menu pc-menu";
+      menuEl.innerHTML = items.map((it) => (it === "-" ? '<div class="xp-menu-sep"></div>' : `<button type="button" class="xp-menu-item" data-k="${it[0]}" ${it[2] === false ? "disabled" : ""}>${it[1]}</button>`)).join("");
+      desk.appendChild(menuEl);
+      const r = desk.getBoundingClientRect();
+      menuEl.style.left = Math.max(0, Math.min(x - r.left, r.width - menuEl.offsetWidth - 4)) + "px";
+      menuEl.style.top = Math.max(0, Math.min(y - r.top, r.height - menuEl.offsetHeight - 4)) + "px";
+      menuEl.addEventListener("mousedown", (ev) => ev.stopPropagation());
+      menuEl.addEventListener("click", (ev) => {
+        const b = ev.target.closest(".xp-menu-item");
+        if (!b || b.disabled) return;
+        menuZu();
+        const n = N(iconSel);
+        switch (b.dataset.k) {
+          case "oeffnen": if (n) { if (n.kinder || n.typ === "pc" || n.typ === "papierkorb") oeffneExplorer(n.id); else oeffneDatei(n.id); } break;
+          case "ausschneiden": dOps.ablage("cut"); break;
+          case "kopieren": dOps.ablage("copy"); break;
+          case "einfuegen": dOps.einfuegen("desktop"); break;
+          case "einfuegen-in": if (n) dOps.einfuegen(n.id); break;
+          case "loeschen": dOps.loeschen(); break;
+          case "umbenennen": if (n) umbenennen(n.id); break;
+          case "leeren": dOps.papierkorbLeeren(); break;
+          case "neu-ordner": dOps.neu("ordner"); break;
+          case "neu-word": dOps.neu("word"); break;
+          case "neu-text": dOps.neu("text"); break;
+          case "aktualisieren": aktualisieren(); break;
+        }
+      });
+    }
+    desk.addEventListener("contextmenu", (e) => {
+      if (e.target.closest(".dw") || e.target.closest(".pc-start")) return;
+      e.preventDefault();
+      startEl.hidden = true;
+      const i = e.target.closest(".pc-icon");
+      iconSel = i ? i.dataset.id : null;
+      zeigeIconAuswahl();
+      pc.focus();
+      T.ereignis("desktop:rechtsklick");
+      const n = N(iconSel);
+      if (!n) {
+        deskMenu(e.clientX, e.clientY, [["aktualisieren", "Aktualisieren"], "-", ["einfuegen", "Einfügen", !!ABL.clip], "-",
+          ["neu-ordner", "Neu › Ordner"], ["neu-word", "Neu › Microsoft Word-Dokument"], ["neu-text", "Neu › Textdokument"]]);
+      } else if (n.typ === "pc") deskMenu(e.clientX, e.clientY, [["oeffnen", "<b>Öffnen</b>"]]);
+      else if (n.typ === "papierkorb") deskMenu(e.clientX, e.clientY, [["oeffnen", "<b>Öffnen</b>"], "-", ["leeren", "Papierkorb leeren", N("papierkorb").kinder.length > 0]]);
+      else deskMenu(e.clientX, e.clientY, [["oeffnen", "<b>Öffnen</b>"], "-", ["ausschneiden", "Ausschneiden", !n.fest], ["kopieren", "Kopieren"],
+        ...(n.kinder ? [["einfuegen-in", "Einfügen", !!ABL.clip]] : []), "-", ["loeschen", "Löschen", !n.fest], ["umbenennen", "Umbenennen", !n.fest]]);
+    });
+    // Tastenkürzel, wenn der Desktop (nicht ein Fenster) im Fokus ist
+    pc.addEventListener("keydown", (e) => {
+      if (e.target !== pc) return;
+      const strg = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+      if (e.key === "Escape") { menuZu(); return; }
+      if (strg && k === "v") { e.preventDefault(); T.taste("Strg+V"); dOps.einfuegen("desktop"); return; }
+      if (!iconSel || !N(iconSel) || ["pc", "papierkorb"].includes(iconSel)) return;
+      if (strg && k === "c") { e.preventDefault(); T.taste("Strg+C"); dOps.ablage("copy"); }
+      else if (strg && k === "x") { e.preventDefault(); T.taste("Strg+X"); dOps.ablage("cut"); }
+      else if (e.key === "F2") { e.preventDefault(); T.taste("F2"); umbenennen(iconSel); }
+      else if (e.key === "Delete") { e.preventDefault(); T.taste("Entf"); dOps.loeschen(); }
+      else if (e.key === "Enter") { e.preventDefault(); const n = N(iconSel); if (n.kinder) oeffneExplorer(n.id); else oeffneDatei(n.id); }
+    });
+
     desk.addEventListener("mousedown", (e) => {
+      menuZu();
       if (e.target === desk || e.target === iconsEl) { iconSel = null; zeigeIconAuswahl(); }
       if (!e.target.closest(".pc-start") && !e.target.closest(".pc-startbtn")) startEl.hidden = true;
     });

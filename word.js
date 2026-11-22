@@ -715,11 +715,45 @@ KL.word = (() => {
       const pos = punktUnterMaus(e);
       if (!pos) return;
       const b = befundListe.find((x) => { try { return x.range.comparePoint(pos.node, pos.off) === 0; } catch (err) { return false; } });
-      if (!b) return; // sonst normales Kontextmenü
       e.preventDefault();
+      if (!b) { zeigeBearbeiten(e.clientX, e.clientY); return; }
       T.ereignis("korrekturmenue");
       zeigeKorrektur(b, e.clientX, e.clientY);
     });
+    // Rechtsklick ohne Fehler: Ausschneiden / Kopieren / Einfügen wie in Word.
+    // Zählt wie das Menüband (mit der Maus statt Tastenkombination).
+    function zeigeBearbeiten(x, y) {
+      const hatAuswahl = !!markierung();
+      ctxBox.innerHTML = `<button type="button" data-k="ausschneiden" ${hatAuswahl ? "" : "disabled"}>✂️ Ausschneiden <span class="wr-ctx-kurz">Strg+X</span></button>`
+        + `<button type="button" data-k="kopieren" ${hatAuswahl ? "" : "disabled"}>⧉ Kopieren <span class="wr-ctx-kurz">Strg+C</span></button>`
+        + `<button type="button" data-k="einfuegen" ${KL.zwischenablage ? "" : "disabled"}>📋 Einfügen <span class="wr-ctx-kurz">Strg+V</span></button>`;
+      ctxBox.hidden = false;
+      const w = wr.getBoundingClientRect();
+      ctxBox.style.left = Math.max(4, Math.min(x - w.left, w.width - ctxBox.offsetWidth - 6)) + "px";
+      ctxBox.style.top = Math.max(4, Math.min(y - w.top, w.height - ctxBox.offsetHeight - 6)) + "px";
+      ctxBox.onclick = (ev) => {
+        const k = ev.target.closest("button");
+        if (!k || k.disabled) return;
+        ctxBox.hidden = true;
+        const c = k.dataset.k;
+        if (nm) { nmBox.classList.remove("wackel"); void nmBox.offsetWidth; nmBox.classList.add("wackel"); return; }
+        T.band("ktx-" + c);
+        if (c === "einfuegen") { ed.focus(); einfuegen(KL.zwischenablage || ""); }
+        else {
+          const sm = markierung();
+          if (sm) {
+            const t = sm.toString();
+            KL.zwischenablage = t; KL.intern.merke(t);
+            merkeKopie();
+            if (c === "ausschneiden") { ed.focus(); document.execCommand("delete"); geaendert(); }
+          }
+        }
+        bandSerie++;
+        if (bandSerie >= KL.CONFIG.BAND_ZWISCHENABLAGE && !nm) nachmachen("band");
+        merkeSelektion();
+        ed.focus();
+      };
+    }
     function naechsterFehler() {
       pruefen();
       if (!befundListe.length) { toast("Die Rechtschreib- und Grammatikprüfung ist abgeschlossen. Keine Fehler gefunden."); return; }

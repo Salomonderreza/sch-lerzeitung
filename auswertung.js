@@ -5,14 +5,14 @@ window.KL = window.KL || {};
 (() => {
   "use strict";
   const { esc } = KL.util;
-  const BAND = { fett: "Fett", kursiv: "Kursiv", unterstrichen: "Unterstrichen", groesser: "Schrift größer", kleiner: "Schrift kleiner", schriftgrad: "Schriftgrad", kopieren: "Kopieren", einfuegen: "Einfügen", ausschneiden: "Ausschneiden", undo: "Rückgängig", redo: "Wiederholen", speichern: "Speichern", links: "Linksbündig", zentriert: "Zentriert", rechts: "Rechtsbündig", rsgr: "Rechtschreibung und Grammatik", nummerierung: "Nummerierung", aufzaehlung: "Aufzählungszeichen" };
-  const NMN = { rueck: "Buchstabenweise gelöscht", zieh: "Einzelnes Wort mit der Maus markiert", band: "Kopieren/Einfügen über das Menüband" };
+  const BAND = { fett: "Fett", kursiv: "Kursiv", unterstrichen: "Unterstrichen", groesser: "Schrift größer", kleiner: "Schrift kleiner", schriftgrad: "Schriftgrad", kopieren: "Kopieren", einfuegen: "Einfügen", ausschneiden: "Ausschneiden", undo: "Rückgängig", redo: "Wiederholen", speichern: "Speichern", links: "Linksbündig", zentriert: "Zentriert", rechts: "Rechtsbündig", rsgr: "Rechtschreibung und Grammatik", nummerierung: "Nummerierung", aufzaehlung: "Aufzählungszeichen", "ktx-kopieren": "Kopieren (Rechtsklick)", "ktx-einfuegen": "Einfügen (Rechtsklick)", "ktx-ausschneiden": "Ausschneiden (Rechtsklick)" };
+  const NMN = { rueck: "Buchstabenweise gelöscht", zieh: "Einzelnes Wort mit der Maus markiert", band: "Kopieren/Einfügen mit der Maus (Menüband oder Rechtsklick)" };
   KL.ohneHtml = (h) => String(h || "").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 
   // ---------- Arbeitsweise bewerten (0–100 Punkte) mit Feedback ----------
   // Bewertet wird nur, was eindeutig umständlich ist. Ein Teil ohne Daten
   // (z. B. nie etwas markiert) zählt nicht mit; die Gewichte werden verteilt.
-  const KURZ = { fett: "Strg+Umschalt+F", kursiv: "Strg+Umschalt+K", unterstrichen: "Strg+U", groesser: "Strg+Umschalt+>", kleiner: "Strg+<", kopieren: "Strg+C", einfuegen: "Strg+V", ausschneiden: "Strg+X", undo: "Strg+Z", redo: "Strg+Y", links: "Strg+L", zentriert: "Strg+E", rechts: "Strg+R", rsgr: "F7", aufzaehlung: "Strg+Umschalt+L" };
+  const KURZ = { fett: "Strg+Umschalt+F", kursiv: "Strg+Umschalt+K", unterstrichen: "Strg+U", groesser: "Strg+Umschalt+>", kleiner: "Strg+<", kopieren: "Strg+C", einfuegen: "Strg+V", ausschneiden: "Strg+X", undo: "Strg+Z", redo: "Strg+Y", links: "Strg+L", zentriert: "Strg+E", rechts: "Strg+R", rsgr: "F7", aufzaehlung: "Strg+Umschalt+L", "ktx-kopieren": "Strg+C", "ktx-einfuegen": "Strg+V", "ktx-ausschneiden": "Strg+X" };
   KL.arbeitsweise = function (aw) {
     const mk = aw.markiert || {};
     const teile = [];
@@ -31,9 +31,9 @@ window.KL = window.KL || {};
     const bandSumme = bandKurz.reduce((x, [, v]) => x + v, 0);
     if (tastenSumme + bandSumme) {
       const p = Math.round((tastenSumme / (tastenSumme + bandSumme)) * 100);
-      const tipps = bandKurz.sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${BAND[k] || k} ${v}× über das Menüband – schneller mit ${KURZ[k]}`);
+      const tipps = bandKurz.sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${BAND[k] || k} ${v}× mit der Maus – schneller mit ${KURZ[k]}`);
       teile.push({ name: "Tastenkombinationen", gewicht: 30, punkte: p, gut: bandSumme === 0,
-        text: bandSumme ? `${tipps.join(" · ")}.` : `Sehr gut: ${tastenSumme} Befehle mit Tastenkombinationen, keiner über das Menüband.` });
+        text: bandSumme ? `${tipps.join(" · ")}.` : `Sehr gut: ${tastenSumme} Befehle mit Tastenkombinationen, keiner mit der Maus über ein Menü.` });
     }
     // 3. Speichern
     const sS = aw.strgS || 0, sM = aw.speichernMaus || 0;

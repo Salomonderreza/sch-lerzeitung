@@ -702,3 +702,9 @@ a.kl-btn { text-decoration: none; display: inline-flex; align-items: center; }
 .kl-head .sz-zw-btn:hover { background: rgba(255,255,255,0.26); }
 .wr-editor ol, .wr-editor ul { margin: 0 0 8px; padding-left: 30px; }
 .wr-editor li { margin: 0 0 3px; padding-left: 4px; }
+/* Desktop: Rechtsklick-Menü, Umbenennen, ausgeschnittene Symbole */
+.pc-menu { z-index: 100000; color: #1b1b1b; text-shadow: none; }
+.pc-icon.cut { opacity: 0.5; }
+.pc-icon-input { display: block; width: 100%; box-sizing: border-box; font: inherit; font-size: 11.5px; text-align: center; resize: none; border: 1px solid #0a64c8; border-radius: 2px; padding: 1px 2px; color: #111; background: #fff; text-shadow: none; outline: none; }
+.wr-ctx-kurz { float: right; color: #8a8f96; font-size: 0.85em; margin-left: 18px; }
+.wr-ctx button:disabled { color: #aaa; cursor: default; }

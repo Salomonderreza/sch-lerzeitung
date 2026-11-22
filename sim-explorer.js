@@ -184,7 +184,8 @@ KL.sims.explorer = (() => {
     const S = state;
     let sel = [];          // ausgewählte IDs
     let anchor = null;
-    let clip = null;       // { mode: 'copy'|'cut', ids: [] }
+    // Zwischenablage für Dateien: gemeinsam mit dem Desktop
+    const ABL = (KL.fsAblage = KL.fsAblage || { clip: null }); // clip: { mode: 'copy'|'cut', ids: [] }
     let suche = "";
     let renaming = null;   // ID im Umbenennen-Modus
     const undo = [];
@@ -354,7 +355,7 @@ KL.sims.explorer = (() => {
         buttons.push(["neu", "＋ Neu ▾", kannErstellenHier()]);
         buttons.push(["ausschneiden", "✂️ Ausschneiden", sel.length > 0 && !ro && !selFest()]);
         buttons.push(["kopieren", "⧉ Kopieren", sel.length > 0 && c.typ !== "zip"]);
-        buttons.push(["einfuegen", "📋 Einfügen", !!clip && kannErstellenHier()]);
+        buttons.push(["einfuegen", "📋 Einfügen", !!ABL.clip && kannErstellenHier()]);
         buttons.push(["umbenennen", "✏️ Umbenennen", !!one && !ro && !one.fest]);
         buttons.push(["loeschen", "🗑️ Löschen", sel.length > 0 && !ro && !selFest()]);
         buttons.push(["sortieren", "⇅ Sortieren ▾", true]);
@@ -397,7 +398,7 @@ KL.sims.explorer = (() => {
         const nameCell = renaming === n.id
           ? `<input class="xp-rename" value="${esc(n.name)}" spellcheck="false" />`
           : `<span class="xp-ico">${fs.icon(n)}</span>${esc(n.name)}`;
-        const cut = clip && clip.mode === "cut" && clip.ids.includes(n.id);
+        const cut = ABL.clip && ABL.clip.mode === "cut" && ABL.clip.ids.includes(n.id);
         html += `<tr class="xp-row ${isSel ? "sel" : ""} ${cut ? "cut" : ""}" data-id="${n.id}" draggable="${!n.virtuell && !n.fest && c.typ !== "papierkorb"}">
           <td class="xp-name">${nameCell}</td>
           <td>${n.typ === "pc" || n.typ === "usb" || n.typ === "laufwerk" ? "" : esc(n.datum || "")}</td>
@@ -512,10 +513,10 @@ KL.sims.explorer = (() => {
       if (!kannErstellenHier()) return;
       snapshot();
       const id = neueId();
-      const name = eindeutigerName(S.cwd, typ === "ordner" ? "Neuer Ordner" : "Neues Textdokument.txt");
+      const name = eindeutigerName(S.cwd, typ === "ordner" ? "Neuer Ordner" : typ === "word" ? "Neues Microsoft Word-Dokument.docx" : "Neues Textdokument.txt");
       S.nodes[id] = typ === "ordner"
         ? { id, name, typ: "ordner", eltern: S.cwd, kinder: [], datum: jetzt() }
-        : { id, name, typ: "datei", eltern: S.cwd, groesse: 0, datum: jetzt() };
+        : { id, name, typ: "datei", eltern: S.cwd, groesse: 0, datum: jetzt(), ...(typ === "word" ? { inhalt: "" } : {}) };
       N(S.cwd).kinder.push(id);
       log("neu", { typ, pfad: fs.pfadVon(S, id) });
       sel = [id];
@@ -575,21 +576,21 @@ KL.sims.explorer = (() => {
       const ids = sel.filter((id) => N(id));
       if (!ids.length || ["papierkorb"].includes(cwd().typ)) return;
       if (mode === "cut" && (ids.some((id) => N(id).fest) || cwd().typ === "zip" || cwd().typ === "pc")) return;
-      clip = { mode, ids };
+      ABL.clip = { mode, ids };
       log(mode === "copy" ? "kopieren" : "ausschneiden", { namen: ids.map((id) => N(id).name) });
       render();
     }
 
     function einfuegen(zielId) {
       const ziel = zielId || S.cwd;
-      if (!clip || !N(ziel) || ["pc", "papierkorb", "zip"].includes(N(ziel).typ)) return;
-      const ids = clip.ids.filter((id) => N(id) && !istNachfahre(id, "papierkorb"));
-      if (!ids.length) { clip = null; render(); return; }
+      if (!ABL.clip || !N(ziel) || ["pc", "papierkorb", "zip"].includes(N(ziel).typ)) return;
+      const ids = ABL.clip.ids.filter((id) => N(id) && !istNachfahre(id, "papierkorb"));
+      if (!ids.length) { ABL.clip = null; render(); return; }
       if (ids.some((id) => istNachfahre(ziel, id))) { toast("Der Zielordner ist ein Unterordner des Quellordners."); return; }
       snapshot();
       const neu = [];
       for (const id of ids) {
-        if (clip.mode === "copy") {
+        if (ABL.clip.mode === "copy") {
           const nid = deepCopy(id, ziel);
           N(nid).name = eindeutigerName(ziel, N(nid).name, N(id).eltern === ziel);
           N(ziel).kinder.push(nid);
@@ -602,8 +603,8 @@ KL.sims.explorer = (() => {
           neu.push(id);
         }
       }
-      log("einfuegen", { modus: clip.mode, ziel: fs.pfadVon(S, ziel), namen: neu.map((id) => N(id).name) });
-      if (clip.mode === "cut") clip = null;
+      log("einfuegen", { modus: ABL.clip.mode, ziel: fs.pfadVon(S, ziel), namen: neu.map((id) => N(id).name) });
+      if (ABL.clip.mode === "cut") ABL.clip = null;
       sel = ziel === S.cwd ? neu : [];
       save();
       render();
@@ -617,11 +618,11 @@ KL.sims.explorer = (() => {
       ids = ids.filter((id) => N(id) && !N(id).fest && id !== zielId && !istNachfahre(zielId, id));
       if (!ids.length) return;
       const copy = laufwerkVon(zielId) !== laufwerkVon(ids[0]);
-      const alt = clip;
-      clip = { mode: copy ? "copy" : "cut", ids };
-      log("ziehen", { modus: clip.mode });
+      const alt = ABL.clip;
+      ABL.clip = { mode: copy ? "copy" : "cut", ids };
+      log("ziehen", { modus: ABL.clip.mode });
       einfuegen(zielId);
-      clip = alt && alt.mode === "copy" ? alt : null;
+      ABL.clip = alt && alt.mode === "copy" ? alt : null;
     }
 
     function extrahieren() {
@@ -765,11 +766,12 @@ KL.sims.explorer = (() => {
       switch (k) {
         case "neu": {
           const b = elToolbar.querySelector('[data-act="neu"]').getBoundingClientRect();
-          menu(b.left, b.bottom, [["neu-ordner", "📁 Ordner"], ["neu-text", "📄 Textdokument"]]);
+          menu(b.left, b.bottom, [["neu-ordner", "📁 Ordner"], ["neu-word", "📘 Microsoft Word-Dokument"], ["neu-text", "📄 Textdokument"]]);
           break;
         }
         case "neu-ordner": neu("ordner"); break;
         case "neu-text": neu("text"); break;
+        case "neu-word": neu("word"); break;
         case "oeffnen": if (sel.length === 1) open(sel[0]); break;
         case "ausschneiden": kopieren("cut"); break;
         case "kopieren": kopieren("copy"); break;
@@ -828,7 +830,7 @@ KL.sims.explorer = (() => {
         items.push("-");
         items.push(["ausschneiden", "Ausschneiden", !ro && !selFest()]);
         items.push(["kopieren", "Kopieren"]);
-        if (n.kinder && clip && n.typ === "ordner") items.push(["einfuegen-in", "Einfügen"]);
+        if (n.kinder && ABL.clip && n.typ === "ordner") items.push(["einfuegen-in", "Einfügen"]);
         items.push("-");
         items.push(["zip", "Senden an › ZIP-komprimierter Ordner", !ro && kannErstellenHier()]);
         items.push("-");
@@ -843,8 +845,9 @@ KL.sims.explorer = (() => {
       }
       menu(x, y, [
         ["sortieren", "Sortieren nach ›"], "-",
-        ["einfuegen", "Einfügen", !!clip && kannErstellenHier()], "-",
+        ["einfuegen", "Einfügen", !!ABL.clip && kannErstellenHier()], "-",
         ["neu-ordner", "Neu › Ordner", kannErstellenHier()],
+        ["neu-word", "Neu › Microsoft Word-Dokument", kannErstellenHier()],
         ["neu-text", "Neu › Textdokument", kannErstellenHier()],
       ]);
       const s = root.querySelector('.xp-menu [data-k="sortieren"]');
