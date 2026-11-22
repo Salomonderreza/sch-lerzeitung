@@ -7,7 +7,7 @@
    ===================================================================== */
 window.KL = window.KL || {};
 
-KL.sitzungsbericht = async function ({ P, nr, def, R, sicherung }) {
+KL.sitzungsbericht = async function ({ P, nr, def, R, sicherung, zwischen }) {
   const U = KL.util;
   const d = KL.sitzungsDaten(def, R, P.daten.fs);
   const doc = new KL.PDF.Doc();
@@ -37,7 +37,7 @@ KL.sitzungsbericht = async function ({ P, nr, def, R, sicherung }) {
   const ende = R.beendet || Date.now();
 
   // ---------- Kopf ----------
-  doc.text(L, y, "PROJEKT SCHÜLERZEITUNG · SITZUNGSBERICHT", { font: "B", size: 9, color: PETROL });
+  doc.text(L, y, zwischen ? "PROJEKT SCHÜLERZEITUNG · ZWISCHENSTAND (Sitzung noch nicht beendet)" : "PROJEKT SCHÜLERZEITUNG · SITZUNGSBERICHT", { font: "B", size: 9, color: zwischen ? ROT : PETROL });
   y += 22;
   doc.wrap(`Sitzung ${nr}: ${def.thema}`, W, "B", 16).forEach((ln) => { doc.text(L, y, ln, { font: "B", size: 16 }); y += 20; });
   doc.text(L, y, `${def.textsorte} · Ordner „${def.ordner}“ · Datei „${def.datei}“`, { size: 10.5, color: GRAU });
@@ -46,15 +46,17 @@ KL.sitzungsbericht = async function ({ P, nr, def, R, sicherung }) {
   y += 20;
   kv("Name", P.name);
   kv("Klasse / Kurs", P.klasse);
-  kv("Datum", `${U.fmtDatum(R.start)} (Sitzung beendet ${U.fmtZeit(ende)} Uhr)`);
+  kv("Datum", `${U.fmtDatum(R.start)} (${zwischen ? "Zwischenstand von" : "Sitzung beendet"} ${U.fmtZeit(ende)} Uhr)`);
   kv("Arbeitszeit", `${d.aktivMin} ${d.aktivMin === 1 ? "Minute" : "Minuten"} aktiv in der App`);
   y += 6;
   // Note
-  doc.rect(L, y, W, 58, { fill: PETROL });
-  doc.text(L + 16, y + 42, d.note.note, { font: "B", size: 34, color: [1, 1, 1] });
-  doc.text(L + 62, y + 24, `Note: ${d.note.note} (${d.note.wort})`, { font: "B", size: 15, color: [1, 1, 1] });
-  doc.text(L + 62, y + 42, `${d.fertig} von ${d.gesamt} Aufgaben erledigt = ${d.note.basis} %${d.note.bonus && d.note.basis < 100 ? ` + ${KL.CONFIG.BONUS_PROZENT} % Bonus` : ""}`, { size: 10, color: [0.88, 0.94, 0.95] });
-  y += 66;
+  const formel = doc.wrap(KL.noteFormel(d), W - 76, "R", 9);
+  const hNote = 44 + formel.length * 12;
+  doc.rect(L, y, W, hNote, { fill: PETROL });
+  doc.text(L + 16, y + 30 + formel.length * 6, d.note.note, { font: "B", size: 34, color: [1, 1, 1] });
+  doc.text(L + 62, y + 24, `${zwischen ? "Vorläufige Note" : "Note"}: ${d.note.note} (${d.note.wort})`, { font: "B", size: 15, color: [1, 1, 1] });
+  formel.forEach((ln, i) => doc.text(L + 62, y + 42 + i * 12, ln, { size: 9, color: [0.88, 0.94, 0.95] }));
+  y += hNote + 8;
   doc.rect(L, y, W, 44, { fill: [0.9, 0.94, 0.95] });
   doc.text(L + 14, y + 18, "Aufgaben", { font: "B", size: 10, color: PETROL });
   doc.text(L + 14, y + 35, `${d.fertig} von ${d.gesamt} erledigt`, { font: "B", size: 14 });
@@ -111,8 +113,45 @@ KL.sitzungsbericht = async function ({ P, nr, def, R, sicherung }) {
     y += 6;
   }
 
+  // ---------- KI-Fassung ----------
+  titel("KI-Fassung und Vergleich");
+  if (!d.ki) zeile("Noch keine KI-Fassung eingefügt.", { color: zwischen ? GRAU : ROT });
+  else if (!d.ki.vergleich) zeile("KI-Fassung vorhanden, aber der Artikel fehlt zum Vergleich.", { color: ROT });
+  else {
+    const v = d.ki.vergleich;
+    zeile(`Die KI hat ${v.anteil} % des Textes verändert: ${KL.vergleichStufe(v.anteil)}. Original ${v.woerterA} Wörter, KI-Fassung ${v.woerterB} Wörter.`, { font: "B", size: 10, color: v.anteil > 40 ? ROT : SCHWARZ });
+    y += 2;
+    zeile("Reflexion: " + (d.ki.reflexion || "– (fehlt)"), { size: 9.5, color: d.ki.reflexion ? SCHWARZ : ROT });
+    // Wortfluss mit Markierungen
+    const fluss = (woerter, farbe, art) => {
+      const size = 9, zeilenH = 12.5;
+      let x = L + 10;
+      platz(zeilenH);
+      woerter.forEach(([w, t]) => {
+        const bw = doc.width(w, "R", size), sp = doc.width(" ", "R", size);
+        if (x + bw > Rr - 4) { y += zeilenH; x = L + 10; platz(zeilenH); }
+        doc.text(x, y + size, w, { size, color: t ? farbe : GRAU });
+        if (t && art === "durch") doc.line(x, y + size * 0.65, x + bw, y + size * 0.65, { width: 0.7, color: farbe });
+        if (t && art === "unter") doc.line(x, y + size + 1.6, x + bw, y + size + 1.6, { width: 0.7, color: farbe });
+        x += bw + sp;
+      });
+      y += zeilenH + 4;
+    };
+    y += 4;
+    zeile("Original (rot durchgestrichen = von der KI entfernt oder ersetzt):", { font: "B", size: 9, color: PETROL });
+    fluss(v.a, ROT, "durch");
+    zeile("KI-Fassung (grün unterstrichen = von der KI neu geschrieben):", { font: "B", size: 9, color: PETROL });
+    fluss(v.b, GRUEN, "unter");
+  }
+
   // ---------- Arbeitsweise ----------
   titel("Arbeitsweise in Word");
+  if (d.arbeitsweise.leer) zeile("Noch keine Arbeit in Word erkennbar.", { color: GRAU });
+  else {
+    zeile(`${d.arbeitsweise.punkte} von 100 Punkten (zählt ${d.note.anteilAW} % der Note)`, { font: "B", size: 11 });
+    d.arbeitsweise.teile.forEach((t) => zeile(`${t.gut ? "+" : "–"} ${t.name} (${t.punkte} Punkte): ${t.text}`, { size: 9.5, x: 6, color: t.gut ? GRUEN : ROT }));
+    y += 4;
+  }
   const mk = d.markiert;
   kv("Effektiv markiert", d.quote == null ? "–" : `${d.quote} %`);
   kv("Doppelklick / Dreifachklick", `${mk.doppelklick || 0} / ${mk.dreifach || 0}`);
@@ -171,7 +210,7 @@ KL.sitzungsbericht = async function ({ P, nr, def, R, sicherung }) {
     const s = `Seite ${i + 1} von ${n}`;
     doc.text(Rr - doc.width(s, "R", 8), KL.PDF.PAGE_H - 28, s, { size: 8, color: GRAU });
   });
-  doc.info = { Title: `Sitzungsbericht ${nr} – ${P.name}`, Author: P.name, Subject: `Schülerzeitung – Sitzung ${nr}: ${def.thema}`, CreationDate: "D:" + new Date(ende).toISOString().replace(/[-:T]/g, "").slice(0, 14) };
+  doc.info = { Title: `${zwischen ? "Zwischenstand" : "Sitzungsbericht"} ${nr} – ${P.name}`, Author: P.name, Subject: `Schülerzeitung – Sitzung ${nr}: ${def.thema}`, CreationDate: "D:" + new Date(ende).toISOString().replace(/[-:T]/g, "").slice(0, 14) };
   doc.anhang = sicherung;
   return doc.output();
 };

@@ -31,8 +31,20 @@ Diese Version enthält **Sitzung 1 „Eine Meldung aus meiner Stadt“** vollst�
 - **Einfügen von außen ist gesperrt.** Das gilt für Strg+V, Rechtsklick, Ziehen und Windows+V, auch in Dateinamen-Feldern. Text, der in der App selbst kopiert wurde, darf eingefügt werden.
 - **Schreibprotokoll:** Es erfasst getippte und gelöschte Zeichen, Zeichen im Artikel, blockierte Einfügeversuche, Wechsel aus der App, die Arbeitszeit und den Tippverlauf pro Minute.
 
-## Note
-Die Note ergibt sich aus dem Anteil der erledigten Aufgaben; die Bonusaufgabe gibt 5 Prozentpunkte dazu. Der Notenschlüssel steht in `config.js` (`NOTEN`, `BONUS_PROZENT`) und kann angepasst werden: ab 92 % → 1, ab 81 % → 2, ab 67 % → 3, ab 50 % → 4, ab 30 % → 5, darunter 6. Die Note steht auf der Auswertung und im PDF-Bericht.
+## Note und Arbeitsweise
+Die Note setzt sich zusammen aus **70 % Aufgaben** und **30 % Arbeitsweise**, die Bonusaufgabe gibt 5 Prozentpunkte dazu (`config.js`: `NOTEN`, `ARBEITSWEISE_ANTEIL`, `ARBEITSWEISE_AB`, `BONUS_PROZENT`). Notenschlüssel: ab 92 % → 1, ab 81 % → 2, ab 67 % → 3, ab 50 % → 4, ab 30 % → 5, darunter 6.
+
+Die Arbeitsweise (0–100 Punkte) besteht aus vier Teilen, jeweils mit konkretem Feedback:
+- Markieren (40 %): Doppelklick, Dreifachklick, Tastatur statt einzelne Wörter mit der Maus ziehen
+- Tastenkombinationen (30 %): Befehle per Tastenkombination statt über das Menüband
+- Speichern (15 %): Strg+S statt Menü
+- Nachmachen (15 %): jedes Nachmachen kostet 25 Punkte
+
+## KI-Fassung (Schritt 1 nach „Sitzung beenden“)
+Die SuS kopieren ihren fertigen Text, lassen ihn von der freigegebenen KI verbessern und fügen die KI-Fassung in ein eigenes Feld ein – nur dort ist Einfügen erlaubt; der Text gelangt nicht in Word oder den Redaktions-PC. Die App vergleicht Wort für Wort, zeigt den Änderungsanteil (bis 15 % leicht, bis 40 % deutlich, darüber stark umgeschrieben) und markiert Entferntes und Neues. Dazu schreiben die SuS eine kurze Reflexion (Einfügen gesperrt). Die KI-Fassung wird als Word-Datei (`…_KI.docx`, mit den Überschriften-Formaten des Originals) heruntergeladen und kommt in den echten Ordner; sie wird veröffentlicht. Vergleich und Reflexion stehen im PDF-Bericht.
+
+## Zwischenstand
+In der Sitzung sichert der Knopf **💾 Zwischenstand** ein PDF mit dem bisherigen Ergebnis und einer vorläufigen Note, ohne die Sitzung zu beenden. Damit kann man an jedem Laptop weiterarbeiten (Stand aus Bericht laden). Jede*r arbeitet im eigenen Tempo; alle Sitzungen bleiben frei wählbar.
 
 ## Den Redaktions-PC auf den eigenen Computer übertragen
 Vor dem Bericht kommt Schritt 1: Alles, was in der App ist, bauen die SuS auf ihrem eigenen Computer nach (unter *Dokumente*, einstellbar mit `EXPORT_ORT`). Sie erstellen alle Ordner selbst und laden jede Datei als echte Word-Datei (.docx) herunter, dann verschieben sie sie aus *Downloads* in den richtigen Ordner. Die App merkt sich über alle Sitzungen, welche Dateien schon übertragen sind; danach sind nur neue oder geänderte Dateien markiert. Vor dem Herunterladen des Berichts erscheint dieser Hinweis noch einmal, und der Bericht zeigt, wie viele Dateien übertragen wurden.

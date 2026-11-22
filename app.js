@@ -226,6 +226,7 @@
           <span class="kl-head-title">📰 Sitzung ${nr}</span>
           <span class="kl-head-who">${esc(def.thema)} · ${esc(P.name)}</span>
           <span class="kl-timer sz-zeit">0 min</span>
+          <button type="button" class="kl-btn sz-zw-btn" data-zwischen title="Stand als PDF sichern, ohne die Sitzung zu beenden">💾 Zwischenstand</button>
           <button type="button" class="kl-btn primary" data-ende>Sitzung beenden ▸</button>
         </header>
         <div class="kl-savewarn" hidden>⚠ Dieser Browser kann nicht speichern (privates Fenster?). Sichere deinen Stand rechtzeitig über „Sitzung beenden“.</div>
@@ -357,6 +358,33 @@
     const onUnload = (e) => { sichern(); if (pcApi.ungespeichert()) { e.preventDefault(); e.returnValue = ""; } };
     window.addEventListener("beforeunload", onUnload);
 
+    // ----- Zwischenstand: PDF mit dem aktuellen Stand, Sitzung läuft weiter -----
+    app.querySelector("[data-zwischen]").onclick = async () => {
+      if (pcApi.ungespeichert()) {
+        const ok = await frage(`<p><b>In Word gibt es noch ungespeicherte Änderungen.</b></p><p>Der Zwischenstand enthält nur gespeicherte Dateien. Speichere vorher mit <b>Strg+S</b>.</p>`, "Trotzdem sichern", "Zurück");
+        if (!ok) return;
+      }
+      sichern();
+      const jetzt = new Date();
+      const zname = `Zwischenstand_${String(nr).padStart(2, "0")}_${P.name.replace(/[^\wäöüÄÖÜß-]+/g, "_")}_${String(jetzt.getDate()).padStart(2, "0")}-${String(jetzt.getMonth() + 1).padStart(2, "0")}_${String(jetzt.getHours()).padStart(2, "0")}${String(jetzt.getMinutes()).padStart(2, "0")}.pdf`;
+      let url;
+      try {
+        const blob = await KL.sitzungsbericht({ P, nr, def, R: { ...R, endeOffen: pcApi.anzahlFenster() }, sicherung: sicherungText(nr), zwischen: true });
+        url = URL.createObjectURL(blob);
+      } catch (err) { console.error(err); pcApi.meldung("Fehler beim Erstellen des Zwischenstands."); return; }
+      const m = document.createElement("div");
+      m.className = "kl-modal";
+      m.innerHTML = `<div class="kl-modal-box">
+        <p><b>💾 Zwischenstand sichern</b></p>
+        <p>Die Sitzung läuft weiter. Der Zwischenstand ist ein PDF mit deinem bisherigen Ergebnis und einer <b>vorläufigen Note</b>.</p>
+        <p>Speichere ihn in <b>Dokumente › Schülerzeitung_Berichte</b>. Damit kannst du an <b>jedem Laptop</b> weitermachen: Startseite → „Stand aus Bericht laden“.</p>
+        <div class="kl-modal-btns"><button type="button" class="kl-btn" data-n>Abbrechen</button><a class="kl-btn primary" data-j href="${url}" download="${esc(zname)}">⬇ Zwischenstand herunterladen</a></div></div>`;
+      document.body.appendChild(m);
+      const zu = () => { m.remove(); URL.revokeObjectURL(url); pcApi.aktualisieren && pcApi.aktualisieren(); };
+      m.querySelector("[data-n]").onclick = zu;
+      m.querySelector("[data-j]").addEventListener("click", () => { R.zwischenstaende = (R.zwischenstaende || 0) + 1; sichern(); setTimeout(zu, 1500); pcApi.meldung("✔ Zwischenstand heruntergeladen."); });
+    };
+
     app.querySelector("[data-ende]").onclick = async () => {
       const offen = pcApi.ungespeichert();
       if (offen) {
@@ -410,16 +438,33 @@
         <main class="kl-main">
           <div class="kl-task-kicker">${esc(def.thema)}</div><h2>So lief deine Sitzung</h2>
           ${erg.html}
+          <div class="sz-abgabe sz-ki">
+            <h3>✨ Schritt 1: Deinen Text mit KI verbessern</h3>
+            <div class="sz-wichtig"><b>Hinweis:</b> Deine Lehrkraft vergleicht dein <b>Original</b> mit der <b>KI-Fassung</b>, um sicherzustellen, dass die KI lediglich als <b>Hilfe</b> benutzt wurde und nicht deine eigene Arbeit erledigt hat. In der Schülerzeitung wird die <b>KI-Fassung</b> veröffentlicht.</div>
+            <ol class="sz-schritte">
+              <li><label><input type="checkbox"> <span>Klicke auf <b>„Meinen Text kopieren“</b> und öffne die <b>KI, die eure Lehrkraft freigegeben hat</b>. Gib <b>keine echten Namen</b> oder persönlichen Daten ein.</span></label></li>
+              <li><label><input type="checkbox"> <span>Schreibe der KI einen Auftrag, zum Beispiel: <div class="sz-prompt" data-prompt>Verbessere Rechtschreibung, Grammatik und Ausdruck meines Zeitungsartikels. Behalte meinen Inhalt, meine Überschriften und die Länge bei. Erfinde nichts dazu.</div> und füge danach deinen Text ein.</span></label></li>
+              <li><label><input type="checkbox"> <span>Kopiere die Antwort der KI (nur den Artikel) und füge sie unten in das Feld <b>„KI-Fassung“</b> ein. Nur hier ist Einfügen erlaubt.</span></label></li>
+              <li><label><input type="checkbox"> <span>Lies den Vergleich und schreibe in eigenen Worten, was die KI geändert hat und ob du zustimmst.</span></label></li>
+            </ol>
+            <div class="kl-task-foot"><button type="button" class="kl-btn" data-ki-kopie>📋 Meinen Text kopieren</button><button type="button" class="kl-btn" data-prompt-kopie>📋 Auftrag kopieren</button><span class="sz-ki-kopiert kl-small"></span></div>
+            <p><b>KI-Fassung</b> (hier einfügen mit Strg+V):</p>
+            <textarea data-ki-text placeholder="Hier die verbesserte Fassung der KI einfügen …">${esc((R.ki && R.ki.text) || "")}</textarea>
+            <p><b>Was hat die KI geändert? Stimmst du zu?</b> (mindestens 2 Sätze, selbst schreiben)</p>
+            <textarea class="sz-reflexion" data-ki-reflexion placeholder="Die KI hat … Ich finde …">${esc((R.ki && R.ki.reflexion) || "")}</textarea>
+            <div class="kl-task-foot"><button type="button" class="kl-btn primary" data-ki-vergleich>🔍 Vergleichen und speichern</button><button type="button" class="kl-btn" data-ki-docx ${R.ki && R.ki.text ? "" : "disabled"}>⬇ KI-Fassung als Word-Datei</button><span class="sz-ki-status kl-small"></span></div>
+            <div class="sz-ki-ergebnis"></div>
+          </div>
           <div class="sz-abgabe">
-            <h3>💻 Schritt 1: Deinen Redaktions-PC auf deinem Computer nachbauen</h3>
+            <h3>💻 Schritt 2: Deinen Redaktions-PC auf deinem Computer nachbauen</h3>
             <div class="sz-wichtig"><b>Wichtig:</b> Alles, was in der App ist, musst du auf deinem <b>eigenen Computer</b> nachbauen: <b>alle Ordner erstellen</b> und <b>alle Dateien hineinkopieren</b> – genau so wie im Redaktions-PC.</div>
             <ol class="sz-schritte">
               <li><label><input type="checkbox"> <span>Öffne den Datei-Explorer (Windows+E) und gehe zu <b>${esc(C.EXPORT_ORT || "Dokumente")}</b>. Erstelle dort dieselben Ordner wie unten (was schon da ist, musst du nicht neu anlegen).</span></label></li>
-              <li><label><input type="checkbox"> <span>Lade jede Datei mit <b>⬇</b> herunter. Sie landet meist im Ordner <b>Downloads</b>: Schneide sie dort aus (<b>Strg+X</b>) und füge sie im richtigen Ordner ein (<b>Strg+V</b>).</span></label></li>
+              <li><label><input type="checkbox"> <span>Lade jede Datei mit <b>⬇</b> herunter – auch die <b>KI-Fassung</b> (✨), sie gehört in denselben Ordner wie dein Original. Sie landet meist im Ordner <b>Downloads</b>: Schneide sie dort aus (<b>Strg+X</b>) und füge sie im richtigen Ordner ein (<b>Strg+V</b>).</span></label></li>
               <li><label><input type="checkbox"> <span>Vergleiche zum Schluss: Sieht dein Ordner <b>Schülerzeitung</b> genauso aus wie unten?</span></label></li>
             </ol>
             <div class="sz-export"></div>
-            <h3>📤 Schritt 2: Bericht an deinen Dozenten schicken</h3>
+            <h3>📤 Schritt 3: Bericht an deinen Dozenten schicken</h3>
             <ol class="sz-schritte">
               <li><label><input type="checkbox"> <span><b>Nur beim ersten Mal:</b> Erstelle unter <b>Dokumente</b> den Ordner <b>Schülerzeitung_Berichte</b>.</span></label></li>
               <li><label><input type="checkbox"> <span>Klicke unten auf <b>„Bericht herunterladen“</b>. Fragt der Browser nach dem Speicherort, wähle <b>Dokumente › Schülerzeitung_Berichte</b>. Sonst landet die Datei im Ordner <b>Downloads</b>: Schneide sie dort aus (Strg+X) und füge sie in <b>Schülerzeitung_Berichte</b> ein (Strg+V).</span></label></li>
@@ -440,6 +485,8 @@
     P.daten.export = P.daten.export || {};
     const EX = P.daten.export;
     const aktuell = (pfad) => { const n = KL.pfadFinden(fs, pfad); return !!n && EX[pfad] === KL.exportSumme(n); };
+    const istAktuell = (p) => (p.startsWith("KI:") ? (() => { const Rn = P.daten.sitzungen[+p.slice(3)]; return !!(Rn && Rn.ki) && EX[p] === KL.util.sha256(Rn.ki.text).slice(0, 16); })() : aktuell(p));
+    const kiName = (dn) => dn.datei.replace(/\.docx$/i, "") + "_KI.docx";
     const exportEl = app.querySelector(".sz-export");
     const fs = P.daten.fs;
     const basisNode = KL.pfadFinden(fs, "Desktop/Schülerzeitung");
@@ -448,6 +495,7 @@
       if (!basisNode) { exportEl.innerHTML = "<p>Der Ordner „Schülerzeitung“ fehlt im Redaktions-PC.</p>"; return; }
       exportDateien.length = 0;
       let html = "";
+      const kiAktuell = (snr) => { const Rn = P.daten.sitzungen[snr]; return !!(Rn && Rn.ki) && EX["KI:" + snr] === KL.util.sha256(Rn.ki.text).slice(0, 16); };
       const zeile = (n, tiefe) => {
         const pfad = KL.fs.pfadVon(fs, n.id);
         if (n.kinder) {
@@ -455,6 +503,12 @@
           n.kinder.map((k) => fs.nodes[k]).filter(Boolean)
             .sort((a, b) => (a.kinder ? 0 : 1) - (b.kinder ? 0 : 1) || a.name.localeCompare(b.name, "de"))
             .forEach((k) => zeile(k, tiefe + 1));
+          // KI-Fassungen gehören in den Ordner ihres Artikels
+          KL.SITZUNGEN.filter((dn) => P.daten.sitzungen[dn.nr] && P.daten.sitzungen[dn.nr].ki && KL.gleicherPfad(pfad, `Desktop/Schülerzeitung/${dn.ordner}`)).forEach((dn) => {
+            exportDateien.push("KI:" + dn.nr);
+            const ok = kiAktuell(dn.nr);
+            html += `<div class="sz-export-z ${ok ? "ok" : ""}" style="padding-left:${(tiefe + 1) * 22}px">✨ <span class="sz-export-name">${esc(kiName(dn))}</span> <span class="kl-small">(KI-Fassung, wird veröffentlicht)</span>${ok ? "" : `<span class="sz-export-neu">neu</span>`}<button type="button" class="kl-btn" data-exp-ki="${dn.nr}">⬇ herunterladen</button></div>`;
+          });
         } else {
           exportDateien.push(pfad);
           const neu = !EX[pfad];
@@ -462,7 +516,7 @@
         }
       };
       zeile(basisNode, 0);
-      const n = exportDateien.filter(aktuell).length;
+      const n = exportDateien.filter(istAktuell).length;
       exportEl.innerHTML = `<p class="kl-small">So sieht dein Redaktions-PC aus (${esc(C.EXPORT_ORT || "Dokumente")} › …). Auf deinem Computer aktuell: <b>${n} von ${exportDateien.length}</b> Dateien. Lade alle Dateien mit „neu“ oder „geändert“ herunter – geänderte ersetzen die alte Datei auf deinem Computer.</p>${html}`;
     }
     exportListe();
@@ -482,6 +536,84 @@
       exportListe();
     });
 
+    // ----- KI-Fassung -----
+    const kiEl = app.querySelector(".sz-ki");
+    const kiStatus = kiEl.querySelector(".sz-ki-status");
+    const kiText = kiEl.querySelector("[data-ki-text]");
+    const kiRefl = kiEl.querySelector("[data-ki-reflexion]");
+    const artikelText = () => { const a = erg.artikel; return a ? a.bloecke.map((b) => b.text).join("\n\n") : ""; };
+    const kopiere = async (text, wo) => {
+      let ok = false;
+      try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { ok = false; }
+      if (!ok) {
+        const t = document.createElement("textarea"); t.value = text; t.style.position = "fixed"; t.style.opacity = "0";
+        document.body.appendChild(t); t.select();
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        t.remove();
+      }
+      kiEl.querySelector(".sz-ki-kopiert").textContent = ok ? `✔ ${wo} kopiert – jetzt in der KI einfügen (Strg+V).` : "Kopieren nicht möglich – bitte markieren und Strg+C drücken.";
+    };
+    kiEl.querySelector("[data-ki-kopie]").onclick = () => {
+      if (!erg.artikel) { kiStatus.textContent = "Dein Artikel wurde nicht gefunden – erst speichern."; return; }
+      kopiere(artikelText(), "Text");
+    };
+    kiEl.querySelector("[data-prompt-kopie]").onclick = () => kopiere(kiEl.querySelector("[data-prompt]").textContent.trim(), "Auftrag");
+    // Reflexion: selbst schreiben, kein Einfügen
+    kiRefl.addEventListener("paste", (e) => { e.preventDefault(); kiStatus.textContent = "🚫 Die Reflexion schreibst du selbst – Einfügen ist hier gesperrt."; });
+    kiRefl.addEventListener("drop", (e) => e.preventDefault());
+    function kiZeigen() {
+      const d = KL.sitzungsDaten(def, R, P.daten.fs);
+      const box = kiEl.querySelector(".sz-ki-ergebnis");
+      if (!d.ki || !d.ki.vergleich) { box.innerHTML = ""; return; }
+      const v = d.ki.vergleich;
+      box.innerHTML = `<div class="sz-ki-anteil">Die KI hat <b>${v.anteil} %</b> deines Textes verändert: ${esc(KL.vergleichStufe(v.anteil))}.</div>${KL.vergleichHTML(v)}<p class="kl-small"><span class="sz-del">gestrichen</span> = von der KI entfernt oder ersetzt · <span class="sz-ins">grün</span> = von der KI neu geschrieben</p>`;
+    }
+    kiZeigen();
+    kiEl.querySelector("[data-ki-vergleich]").onclick = () => {
+      const t = kiText.value.trim(), r = kiRefl.value.trim();
+      if (!erg.artikel) { kiStatus.textContent = "Dein Artikel wurde nicht gefunden – erst speichern."; return; }
+      if (t.split(/\s+/).length < 20) { kiStatus.textContent = "Füge zuerst die KI-Fassung deines Artikels ein."; return; }
+      const saetze = r.split(/[.!?]+\s*/).filter((x) => x.trim().split(/\s+/).length >= 3).length;
+      R.ki = { text: t, reflexion: r, zeit: Date.now() };
+      sichern();
+      kiZeigen();
+      kiEl.querySelector("[data-ki-docx]").disabled = false;
+      kiStatus.textContent = saetze >= 2 ? "✔ Gespeichert. Lade jetzt die KI-Fassung als Word-Datei herunter." : "✔ Vergleich gespeichert. Schreibe noch mindestens 2 Sätze zu den Änderungen und klicke erneut.";
+      exportListe();
+    };
+    kiEl.querySelector("[data-ki-docx]").onclick = () => kiHerunterladen(nr);
+    // KI-Fassung als Word-Datei: Formatierung (Überschriften) vom Original übernehmen
+    function kiHtml(text, originalHtml) {
+      const a = originalHtml ? KL.textAnalyse(originalHtml) : null;
+      const kopf = a && a.ueberschrift, zw = a && a.meldungen[0] && a.meldungen[0].kopf;
+      const fmt = (b, t) => {
+        let inner = esc(t);
+        if (b && b.pt && b.pt !== 11) inner = `<span style="font-size:${b.pt}pt">${inner}</span>`;
+        if (b && b.fett) inner = `<b>${inner}</b>`;
+        return `<p${b && b.ausrichtung && b.ausrichtung !== "left" ? ` style="text-align:${b.ausrichtung}"` : ""}>${inner}</p>`;
+      };
+      return text.split(/\n+/).map((x) => x.trim()).filter(Boolean).map((z, i) => {
+        const istKopf = z.split(/\s+/).length <= 12 && !/[.!?:,;]$/.test(z);
+        if (i === 0 && istKopf) return fmt(kopf, z.replace(/^#+\s*|\*\*/g, ""));
+        if (istKopf) return fmt(zw, z.replace(/^#+\s*|\*\*/g, ""));
+        return fmt(null, z.replace(/\*\*/g, ""));
+      }).join("");
+    }
+    function kiHerunterladen(snr) {
+      const dn = KL.SITZUNGEN.find((x) => x.nr === snr), Rn = P.daten.sitzungen[snr];
+      if (!dn || !Rn || !Rn.ki) return;
+      const orig = KL.pfadFinden(fs, `Desktop/Schülerzeitung/${dn.ordner}/${dn.datei}`);
+      const blob = KL.docx(kiHtml(Rn.ki.text, orig && orig.inhalt), kiName(dn).replace(/\.docx$/, ""));
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = kiName(dn);
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      EX["KI:" + snr] = KL.util.sha256(Rn.ki.text).slice(0, 16);
+      sichern();
+      exportListe();
+    }
+    exportEl.addEventListener("click", (e) => { const b = e.target.closest("[data-exp-ki]"); if (b) kiHerunterladen(+b.dataset.expKi); });
+
     // Bericht: erst Hinweis, dann Download über einen echten Link im Dialog
     // (ein Klick der Person – so blockiert kein Browser den Download)
     app.querySelector("[data-dl]").onclick = async () => {
@@ -491,12 +623,13 @@
         const blob = await KL.sitzungsbericht({ P, nr, def, R, sicherung: sicherungText(nr) });
         url = URL.createObjectURL(blob);
       } catch (err) { console.error(err); st.textContent = "Fehler beim Erstellen des Berichts."; return; }
-      const geladen = exportDateien.filter(aktuell).length;
+      const geladen = exportDateien.filter(istAktuell).length;
       const m = document.createElement("div");
       m.className = "kl-modal";
       m.innerHTML = `<div class="kl-modal-box">
         <p><b>Bevor du den Bericht herunterlädst:</b></p>
         <p>Alles, was in der App ist, musst du auf deinem <b>eigenen Computer</b> nachbauen: <b>alle Ordner erstellen</b> und <b>alle Dateien hineinkopieren</b>.</p>
+        ${R.ki ? "" : `<p>⚠️ Du hast noch <b>keine KI-Fassung</b> eingefügt (Schritt 1). Das steht im Bericht.</p>`}
         <p>Auf deinem Computer aktuell: <b>${geladen} von ${exportDateien.length}</b> Dateien.${geladen < exportDateien.length ? " Das steht auch im Bericht." : ""}</p>
         <p>Hast du alles auf deinem Computer nachgebaut?</p>
         <div class="kl-modal-btns"><button type="button" class="kl-btn" data-n>Noch nicht</button><a class="kl-btn primary" data-j href="${url}" download="${esc(dateiname)}">Ja, Bericht herunterladen</a></div></div>`;

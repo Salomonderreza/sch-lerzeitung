@@ -37,6 +37,9 @@ KL.CONFIG = {
     [0, "6", "ungenügend"],
   ],
   BONUS_PROZENT: 5,
+  // Anteil der Arbeitsweise an der Note (Rest: Aufgaben) und ab welcher Sitzung
+  ARBEITSWEISE_ANTEIL: 30,
+  ARBEITSWEISE_AB: 1,
 
   // Wo die SuS ihren Redaktions-PC auf dem echten Computer nachbauen
   EXPORT_ORT: "Dokumente",

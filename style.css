@@ -683,3 +683,20 @@ button.wd-menu:hover { background: #163a6c; }
 .sz-wichtig { background: #fde8e6; border: 1px solid #f2b8b0; border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
 .sz-export-neu { font-size: 0.75em; font-weight: 700; color: #8a5a00; background: #ffe9b0; border-radius: 4px; padding: 1px 6px; }
 a.kl-btn { text-decoration: none; display: inline-flex; align-items: center; }
+.sz-feedback { list-style: none; padding: 0; margin: 6px 0 10px; }
+.sz-feedback li { padding: 6px 10px; margin: 4px 0; border-radius: 6px; background: #eef6ef; border-left: 4px solid #2e8b4a; }
+.sz-feedback li.nok { background: #fff6df; border-left-color: #d9a400; }
+.sz-vgl { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 10px 0; }
+.sz-vgl > div { background: #fff; border: 1px solid #d8dde3; border-radius: 8px; padding: 10px 12px; max-height: 360px; overflow: auto; }
+.sz-vgl h4 { margin: 0 0 6px; font-size: 0.9em; color: #4a5560; }
+.sz-vgl p { margin: 0; line-height: 1.55; font-size: 0.92em; }
+.sz-del { background: #fde2df; color: #9b1c12; text-decoration: line-through; }
+.sz-ins { background: #dcf3e2; color: #135c2a; }
+.sz-ki textarea { width: 100%; min-height: 140px; font: inherit; padding: 8px; border: 1px solid #c9d1d9; border-radius: 6px; box-sizing: border-box; }
+.sz-ki .sz-reflexion { min-height: 70px; }
+.sz-ki-ergebnis { margin-top: 8px; }
+.sz-ki-anteil { font-size: 1.05em; padding: 8px 12px; border-radius: 6px; background: #eef3f6; display: inline-block; }
+.sz-prompt { background: #f4f6f8; border: 1px dashed #b9c3cc; border-radius: 6px; padding: 8px 10px; font-size: 0.92em; }
+@media (max-width: 760px) { .sz-vgl { grid-template-columns: 1fr; } }
+.kl-head .sz-zw-btn { background: rgba(255,255,255,0.14); color: #fff; border: 1px solid rgba(255,255,255,0.55); margin-right: 8px; }
+.kl-head .sz-zw-btn:hover { background: rgba(255,255,255,0.26); }
