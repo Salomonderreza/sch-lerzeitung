@@ -2,7 +2,9 @@
 
 Lernapp zum Projekt Schülerzeitung: Die SuS arbeiten an einem **virtuellen PC** (Desktop, Startmenü, Taskleiste, Fenster) mit **Datei-Explorer** und **Word**. Jede Sitzung hat ein Thema, einen Ordner und einen Artikel. Dazu kommen Windows-Aufgaben am eigenen, wachsenden Bestand.
 
-Diese Version enthält **Sitzung 1 „Eine Meldung aus meiner Stadt“** vollständig. Sie hat 16 Aufgaben in 3 Teilen und eine Bonusaufgabe und dauert ca. 80–90 Minuten. Der Artikel muss mindestens 30 Zeilen lang sein. Die Sitzungen 2–9 sind im Redaktionsplan sichtbar und werden nach demselben Muster ergänzt (Datei `sitzungen.js`).
+Diese Version enthält **Sitzung 1 „Eine Meldung aus meiner Stadt“** und **Sitzung 2 „Top 5: Musik, die mich begleitet“**.
+
+**Sitzung 2** (16 Aufgaben + Bonus): Im neuen Ordner *Redaktion › Posteingang* liegt ein Auftrag der Chefredaktion. Die SuS legen *Top 5 Musik* mit dem Unterordner *Recherche* an, verschieben, benennen um und löschen Dateien. Der Artikel enthält eine Einleitung, eine **nummerierte Liste** (Titel kursiv, Interpret fett), fünf Begründungsabsätze und mindestens 30 Zeilen. Neu in Word: Nummerierung und Aufzählungszeichen (Menüband, Strg+Umschalt+L, AutoFormat „1.“ + Leertaste). Die Hilfen sind knapper als in Sitzung 1 (z. B. „mit der Tastenkombination speichern“ ohne Strg+S zu nennen). Sie hat 16 Aufgaben in 3 Teilen und eine Bonusaufgabe und dauert ca. 80–90 Minuten. Der Artikel muss mindestens 30 Zeilen lang sein. Die Sitzungen 2–9 sind im Redaktionsplan sichtbar und werden nach demselben Muster ergänzt (Datei `sitzungen.js`).
 
 ## Für die SuS
 1. Profil anlegen (Name, Klasse, **PIN**). Mehrere Personen können denselben Laptop nutzen.

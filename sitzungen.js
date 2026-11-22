@@ -11,7 +11,7 @@ window.KL = window.KL || {};
   // ---------- Themenliste (liegt als Word-Datei im Ordner Redaktion) ----------
   const THEMEN = [
     [1, "Eine Meldung aus meiner Stadt", "Kurzmeldung", "Meine Stadt", "Meldung_Stadt.docx"],
-    [2, "Top 5: Musik, die mich begleitet", "Rangliste", "Musik", "Top5_Musik.docx"],
+    [2, "Top 5: Musik, die mich begleitet", "Rangliste", "Top 5 Musik", "Top5_Musik.docx"],
     [3, "Mein Traumberuf", "Porträt", "Traumberuf", "Traumberuf.docx"],
     [4, "Eine Nachricht aus Social Media", "Bericht", "Social Media", "Nachricht_Social_Media.docx"],
     [5, "Reportage: KI in meinem Alltag", "Reportage mit Bild", "05_KI", "Reportage_KI.docx"],
@@ -105,8 +105,11 @@ window.KL = window.KL || {};
       } else if (n.nodeType === 1) {
         lose = null;
         // Hülle um Absätze (z. B. <div align="center"><p>…</p></div>): hineinschauen
-        if (/^(DIV|SECTION|BLOCKQUOTE|CENTER)$/.test(n.tagName) && n.querySelector(":scope > p, :scope > div, :scope > h1, :scope > h2, :scope > h3")) {
+        if (/^(DIV|SECTION|BLOCKQUOTE|CENTER)$/.test(n.tagName) && n.querySelector(":scope > p, :scope > div, :scope > h1, :scope > h2, :scope > h3, :scope > ol, :scope > ul")) {
           bloecke(n).forEach((el) => out.push({ el }));
+        } else if (/^(OL|UL)$/.test(n.tagName)) {
+          // Listen: jeder Listenpunkt ist ein eigener Block
+          [...n.children].filter((li) => li.tagName === "LI").forEach((li) => out.push({ el: li }));
         } else out.push({ el: n });
       }
     });
@@ -155,8 +158,13 @@ window.KL = window.KL || {};
     let n; while ((n = w.nextNode())) if (n.data.trim()) tn.push(n);
     const st = tn.map((t) => stil(t, b));
     const text = KL.util.norm(b.textContent);
+    const liste = b.tagName === "LI" ? (b.parentElement && b.parentElement.tagName === "UL" ? "ul" : "ol") : null;
     return {
       text,
+      liste,
+      nummer: liste === "ol" ? [...b.parentElement.children].filter((x) => x.tagName === "LI").indexOf(b) + 1 : 0,
+      fettTeil: st.some((x) => x.fett),
+      kursivTeil: st.some((x) => x.kursiv),
       fett: st.length > 0 && st.every((x) => x.fett),
       pt: st.length ? Math.min(...st.map((x) => x.pt)) : 11,
       ausrichtung: ausrichtungVon(b),
@@ -313,6 +321,52 @@ window.KL = window.KL || {};
     if (gut >= 3 && !probleme.length) return null;
     return `Erkannt: ${gut} von 3 Zwischenüberschriften.${probleme.length ? ` Noch nicht richtig formatiert: ${probleme.slice(0, 4).join(" · ")}.` : ""}`;
   }
+  // ---------- Sitzung 2: Top 5 Musik ----------
+  const ZIEL2 = `${BASIS}/Top 5 Musik/Top5_Musik.docx`;
+  const RECHERCHE2 = `${BASIS}/Top 5 Musik/Recherche`;
+  const POST = `${BASIS}/Redaktion/Posteingang`;
+  const MIN_ZEILEN2 = 30;
+  const CHARTS_MARKE = "Notizen für die Musik-Seite";
+  const POST2 = {
+    "Auftrag_Chefredaktion.docx": `<p><b><span style="font-size: 14pt;">Auftrag für die zweite Ausgabe</span></b></p><p>Liebe Redaktion,</p><p>in der nächsten Ausgabe stellt jede und jeder von euch die <b>Top 5</b> der Songs vor, die sie oder ihn begleiten. Legt dafür im Ordner Schülerzeitung den Ordner <b>Top 5 Musik</b> mit einem Unterordner <b>Recherche</b> an.</p><p>Die Datei <b>charts_entwurf.docx</b> hier im Posteingang gehört in euren Recherche-Ordner. Bitte benennt sie dort in <b>Charts_Recherche.docx</b> um. Die alte Anzeige <b>werbung_alt.docx</b> brauchen wir nicht mehr: bitte löschen.</p><p>Viele Grüße<br>eure Chefredaktion</p>`,
+    "charts_entwurf.docx": `<p><b>${CHARTS_MARKE}</b></p><p>Was hören die Leute gerade? Fragt in der Familie und im Freundeskreis nach. Notiert Titel, Interpret und warum der Song gefällt.</p>`,
+    "werbung_alt.docx": "<p>Anzeige: Sommerfest-Rabatt bei Pizzeria Luigi – gültig bis 31.08.2025.</p>",
+  };
+  // Ordner/Datei in einem bestehenden Stand anlegen (falls noch nicht da)
+  function knoten(fsState, elternPfad, name, props = {}) {
+    const el = KL.pfadFinden(fsState, elternPfad);
+    if (!el || !el.kinder) return null;
+    const da = el.kinder.map((id) => fsState.nodes[id]).find((k) => k && k.name === name);
+    if (da) return da;
+    const id = "n" + fsState.seq++;
+    const n = props.ordner
+      ? { id, name, typ: "ordner", eltern: el.id, datum: props.datum || "16.11.2026 08:00", kinder: [] }
+      : { id, name, typ: "datei", eltern: el.id, datum: props.datum || "16.11.2026 08:00", groesse: props.groesse || 14, inhalt: props.inhalt || "" };
+    fsState.nodes[id] = n;
+    el.kinder.push(id);
+    return n;
+  }
+  // gibt es (irgendwo, außer im Papierkorb) eine Datei mit diesem Inhalt?
+  const mitInhalt = (fsState, marke) => Object.values(fsState.nodes).filter((n) => n && !n.kinder && n.inhalt && n.inhalt.includes(marke) && !KL.fs.pfadVon(fsState, n.id).startsWith("Papierkorb"));
+  const imPapierkorb = (fsState, name) => Object.values(fsState.nodes).some((n) => n && n.name === name && KL.fs.pfadVon(fsState, n.id).startsWith("Papierkorb"));
+  const S2 = {
+    kopf: (a) => !!a.ueberschrift && a.ueberschrift.fett && a.ueberschrift.pt >= 16 && a.ueberschrift.ausrichtung === "center",
+    listenpunkte: (a) => a.bloecke.filter((b) => b.liste === "ol"),
+    liste: (a) => S2.listenpunkte(a).length >= 5,
+    listeFormat: (a) => S2.listenpunkte(a).filter((b) => b.kursivTeil && b.fettTeil).length >= 5,
+    einleitung: (a) => { const i = a.bloecke.findIndex((b) => b.liste); return i > 1 && a.bloecke.slice(1, i).some((b) => b.saetze >= 3); },
+    absaetze: (a) => { const i = a.bloecke.map((b) => !!b.liste).lastIndexOf(true); return i >= 0 && a.bloecke.slice(i + 1).filter((b) => !b.liste && b.saetze >= 3).length >= 5; },
+    laenge: (a) => a.zeilen >= MIN_ZEILEN2,
+  };
+  function listenDiagnose(a) {
+    if (!a) return null;
+    const lp = S2.listenpunkte(a);
+    const getippt = a.bloecke.filter((b) => !b.liste && /^\d+[.)]\s*\S/.test(b.text)).length;
+    if (!lp.length) return getippt ? `Du hast ${getippt} Nummern selbst getippt. Nutze die Nummerierung: Start › Absatz › Nummerierung oder „1.“ + Leertaste am Zeilenanfang.` : "Noch keine nummerierte Liste gefunden.";
+    const ohne = lp.filter((b) => !(b.kursivTeil && b.fettTeil));
+    return `Erkannt: ${lp.length} Listenpunkte${ohne.length ? `. Noch ohne kursiven Titel und fetten Interpreten: ${ohne.slice(0, 3).map((b) => `„${b.text.slice(0, 30)}“`).join(" · ")}` : ""}.`;
+  }
+
   const leserbriefeGelesen = (P) => [...P.ev].filter((e) => e.startsWith(`word:geoeffnet:${BASIS}/Redaktion/Leserbriefe/`)).length;
 
   KL.SITZUNGEN = [
@@ -394,6 +448,93 @@ window.KL = window.KL || {};
       ],
       bonus: { id: "bonus", text: "<b>Bonus für Schnelle:</b> Beantworte deinen Leserwunsch: Schreibe eine kurze Antwort (mindestens 5 Sätze) und speichere sie als <b>Antwort_Leserbrief.docx</b> im Ordner <b>Meine Stadt</b>.",
         pruef: (P) => { const a = gespeichert(P, `${BASIS}/Meine Stadt/Antwort_Leserbrief.docx`); return !!a && a.saetze + (a.ueberschrift ? a.ueberschrift.saetze : 0) >= 5; } },
+    },
+    {
+      nr: 2, thema: THEMEN[1][1], textsorte: "Rangliste", ordner: "Top 5 Musik", datei: "Top5_Musik.docx", minuten: 90,
+      laenge: { ziel: ZIEL2, zeilen: MIN_ZEILEN2 },
+      einleitung: "Die Chefredaktion hat einen neuen Auftrag geschickt: Stelle die fünf Songs vor, die dich begleiten – als nummerierte Rangliste mit einer Begründung zu jedem Song. Vorher räumst du den Posteingang der Redaktion auf. Dein Artikel wird mindestens 30 Zeilen lang. Recherchieren ist erlaubt, schreiben musst du selbst.",
+      vorbereiten: (fsState) => {
+        knoten(fsState, `${BASIS}/Redaktion`, "Posteingang", { ordner: true });
+        Object.entries(POST2).forEach(([name, html], i) => knoten(fsState, POST, name, { inhalt: html, groesse: 12 + i * 3, datum: `16.11.2026 0${8 + i}:1${i}` }));
+        // Themenliste auf den aktuellen Stand bringen (Ordnername „Top 5 Musik“)
+        const tl = KL.pfadFinden(fsState, `${BASIS}/Redaktion/Themenliste.docx`);
+        if (tl && tl.inhalt && tl.inhalt.includes("Ordner: Musik ·")) tl.inhalt = THEMENLISTE_HTML;
+      },
+      aufgaben: [
+        { teil: "A · Der Posteingang der Redaktion" },
+        { id: "auftrag", text: "Im Ordner <b>Redaktion</b> gibt es einen neuen Ordner <b>Posteingang</b>. Lies dort den <b>Auftrag der Chefredaktion</b>.",
+          pruef: (P) => P.ev.has(`oeffne:${POST}/Auftrag_Chefredaktion.docx`) || P.ev.has(`word:geoeffnet:${POST}/Auftrag_Chefredaktion.docx`) },
+        { id: "ordner", text: "Lege im Ordner <b>Schülerzeitung</b> den Ordner <b>Top 5 Musik</b> an und darin den Unterordner <b>Recherche</b>.",
+          teile: [
+            ["haupt", "Ordner <b>Top 5 Musik</b>", (P) => pfadOk(P.fs, `${BASIS}/Top 5 Musik`, "ordner")],
+            ["unter", "Unterordner <b>Recherche</b> darin", (P) => pfadOk(P.fs, RECHERCHE2, "ordner")],
+          ],
+          hinweis: (P) => wo(P, RECHERCHE2, "ordner") },
+        { id: "verschieben", text: "<b>Verschiebe</b> die Datei <b>charts_entwurf.docx</b> aus dem Posteingang in den Ordner <b>Recherche</b> (ausschneiden und einfügen – nicht kopieren).",
+          pruef: (P) => { const d = mitInhalt(P.fs, CHARTS_MARKE); return d.length === 1 && KL.gleicherPfad(KL.fs.pfadVon(P.fs, d[0].eltern) || "", RECHERCHE2); },
+          hinweis: (P) => {
+            const d = mitInhalt(P.fs, CHARTS_MARKE);
+            if (d.length > 1) return `Die Datei gibt es ${d.length}-mal – du hast sie kopiert statt verschoben. Lösche die Kopie im Posteingang.`;
+            if (d.length === 1) { const ort = KL.fs.pfadVon(P.fs, d[0].id); if (!KL.gleicherPfad(ort.split("/").slice(0, -1).join("/"), RECHERCHE2)) return `Die Datei liegt gerade in ${ort.split("/").slice(0, -1).join(" › ")}.`; }
+            if (!d.length && imPapierkorb(P.fs, "charts_entwurf.docx")) return "Die Datei liegt im Papierkorb. Stelle sie wieder her.";
+            return null;
+          } },
+        { id: "umbenennen", text: "Benenne die Datei im Ordner Recherche in <b>Charts_Recherche.docx</b> um.",
+          pruef: (P) => { const n = KL.pfadFinden(P.fs, `${RECHERCHE2}/Charts_Recherche.docx`); return !!n && !!n.inhalt && n.inhalt.includes(CHARTS_MARKE); },
+          hinweis: (P) => wo(P, `${RECHERCHE2}/Charts_Recherche.docx`, "datei") },
+        { id: "loeschen", text: "Lösche die alte Anzeige <b>werbung_alt.docx</b> im Posteingang.",
+          pruef: (P) => !KL.pfadFinden(P.fs, `${POST}/werbung_alt.docx`) && imPapierkorb(P.fs, "werbung_alt.docx") },
+        { teil: "B · Deine Top 5 schreiben" },
+        { id: "kopf", text: "Starte Word. Schreibe eine Hauptüberschrift, z. B. <b>„Meine Top 5: …“</b> – <b>fett</b>, <b>mindestens 16 pt</b>, <b>zentriert</b>.",
+          pruef: (P) => texte(P, ZIEL2).some(S2.kopf) },
+        { id: "einleitung", text: "Schreibe darunter eine <b>Einleitung</b> mit mindestens 3 Sätzen: Welche Rolle spielt Musik in deinem Leben?",
+          pruef: (P) => texte(P, ZIEL2).some(S2.einleitung) },
+        { id: "liste", text: "Schreibe deine Top 5 als <b>nummerierte Liste</b> (Start › Absatz › <b>Nummerierung</b> – oder tippe am Zeilenanfang <b>1.</b> und eine Leertaste). Ein Listenpunkt pro Song.",
+          pruef: (P) => texte(P, ZIEL2).some(S2.liste),
+          hinweis: (P) => { const t = texte(P, ZIEL2); return t.length ? listenDiagnose(t.reduce((x, y) => (S2.listenpunkte(y).length > S2.listenpunkte(x).length ? y : x))) : null; } },
+        { id: "listeformat", text: "In jedem Listenpunkt ist der <b>Songtitel kursiv</b> und der <b>Interpret fett</b>, z. B. <i>Titel</i> von <b>Interpret</b>.",
+          pruef: (P) => texte(P, ZIEL2).some(S2.listeFormat),
+          hinweis: (P) => { const t = texte(P, ZIEL2); return t.length ? listenDiagnose(t.reduce((x, y) => (S2.listenpunkte(y).filter((b) => b.kursivTeil && b.fettTeil).length > S2.listenpunkte(x).filter((b) => b.kursivTeil && b.fettTeil).length ? y : x))) : null; } },
+        { id: "absaetze", text: "Schreibe <b>unter der Liste</b> zu jedem Song einen eigenen Absatz mit mindestens 3 Sätzen: Warum gehört er in deine Top 5?",
+          pruef: (P) => texte(P, ZIEL2).some(S2.absaetze) },
+        { id: "laenge", text: `Dein Artikel ist insgesamt <b>mindestens ${MIN_ZEILEN2} Zeilen</b> lang.`,
+          pruef: (P) => texte(P, ZIEL2).some(S2.laenge),
+          hinweis: (P) => { const z = Math.max(0, ...texte(P, ZIEL2).map((a) => a.zeilen)); return z ? `Bisher ${z} von ${MIN_ZEILEN2} Zeilen.` : null; } },
+        { id: "speichern", text: "Speichere deinen Artikel früh als <b>Top5_Musik.docx</b> im Ordner <b>Top 5 Musik</b>.",
+          pruef: (P) => pfadOk(P.fs, ZIEL2, "datei"),
+          hinweis: (P) => wo(P, ZIEL2, "datei") },
+        { id: "strgs", text: "Speichere zwischendurch mindestens dreimal – mit der <b>Tastenkombination</b>.",
+          pruef: (P) => (P.aw.strgS || 0) >= 3 },
+        { teil: "C · Korrigieren und abschließen" },
+        { id: "korrektur", text: "Korrigiere alle roten und blauen Stellen. <b>Namen</b> von Bands und Songs nimmst du per Rechtsklick mit <b>„Zum Wörterbuch hinzufügen“</b> oder <b>„Alle ignorieren“</b> auf. Speichere danach.",
+          pruef: (P) => {
+            const z = KL.pfadFinden(P.fs, ZIEL2);
+            if (!z || !z.inhalt || !KL.pruefung.istBereit()) return false;
+            const f = KL.pruefung.fehler(z.inhalt);
+            return !!f && f.rs.length === 0 && f.gr.length === 0 && KL.textAnalyse(z.inhalt).woerter >= 40;
+          },
+          hinweis: (P) => {
+            const z = KL.pfadFinden(P.fs, ZIEL2);
+            if (!z) return wo(P, ZIEL2, "datei");
+            if (!z.inhalt || !KL.pruefung.istBereit()) return null;
+            const f = KL.pruefung.fehler(z.inhalt);
+            const n = f.rs.length + f.gr.length;
+            return n ? `In der gespeicherten Datei sind noch ${n} markierte ${n === 1 ? "Stelle" : "Stellen"}${f.rs.length ? `: ${f.rs.slice(0, 5).join(", ")}` : ""}.` : null;
+          } },
+        { id: "fertig", text: `Die <b>gespeicherte</b> Datei enthält alles: Hauptüberschrift, Einleitung, nummerierte Liste mit 5 Songs (Titel kursiv, Interpret fett), 5 Absätze und mindestens ${MIN_ZEILEN2} Zeilen.`,
+          pruef: (P) => { const a = gespeichert(P, ZIEL2); return !!a && S2.kopf(a) && S2.einleitung(a) && S2.liste(a) && S2.listeFormat(a) && S2.absaetze(a) && S2.laenge(a); },
+          hinweis: (P) => {
+            const a = gespeichert(P, ZIEL2);
+            if (!a) return wo(P, ZIEL2, "datei") || "Die Datei ist noch nicht gespeichert.";
+            const fehlt = [!S2.kopf(a) && "Hauptüberschrift (fett, 16 pt, zentriert)", !S2.einleitung(a) && "Einleitung (3 Sätze vor der Liste)", !S2.liste(a) && "nummerierte Liste mit 5 Songs", !S2.listeFormat(a) && "Titel kursiv / Interpret fett", !S2.absaetze(a) && "5 Absätze unter der Liste", !S2.laenge(a) && `${MIN_ZEILEN2} Zeilen (gespeichert sind ${a.zeilen})`].filter(Boolean);
+            return fehlt.length ? `In der gespeicherten Datei fehlt noch: ${fehlt.join(" · ")}. Hast du nach den letzten Änderungen gespeichert?` : null;
+          } },
+        { id: "zu", text: "Schließe zum Schluss alle Fenster.",
+          pruef: (P) => P.offen === 0 && pfadOk(P.fs, ZIEL2, "datei"),
+          hinweis: (P) => wo(P, ZIEL2, "datei") },
+      ],
+      bonus: { id: "bonus", text: "<b>Bonus für Schnelle:</b> Lege im Ordner <b>Recherche</b> die Datei <b>Playlist_Klasse.docx</b> an: eine nummerierte Liste mit mindestens 10 Songs, die in deiner Klasse beliebt sind.",
+        pruef: (P) => { const a = gespeichert(P, `${RECHERCHE2}/Playlist_Klasse.docx`); return !!a && S2.listenpunkte(a).length >= 10; } },
     },
   ];
   KL.aufgabenListe = (def) => def.aufgaben.filter((a) => a.id);

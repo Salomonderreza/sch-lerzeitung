@@ -104,7 +104,7 @@ KL.sitzungsbericht = async function ({ P, nr, def, R, sicherung, zwischen }) {
       const size = Math.max(9, Math.min(17, b.pt * 0.9));
       const font = b.fett ? "B" : "R";
       y += b.fett ? 4 : 0;
-      zeile(b.text, { size, font, x: 10, maxW: W - 10, mitte: b.ausrichtung === "center" });
+      zeile((b.liste === "ol" ? b.nummer + ". " : b.liste === "ul" ? "• " : "") + b.text, { size, font, x: b.liste ? 24 : 10, maxW: W - 10, mitte: b.ausrichtung === "center" });
       y += 3;
     });
     y += 4;

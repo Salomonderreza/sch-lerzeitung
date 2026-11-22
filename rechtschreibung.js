@@ -130,7 +130,7 @@ KL.pruefung = (() => {
 
   // ---------- Text eines Absatzes mit Zuordnung zu Textknoten ----------
   function bloeckeVon(root) {
-    const kinder = [...root.children].filter((el) => /^(P|DIV|H\d|LI)$/.test(el.tagName));
+    const kinder = [...root.children].flatMap((el) => (/^(OL|UL)$/.test(el.tagName) ? [...el.children] : [el])).filter((el) => /^(P|DIV|H\d|LI)$/.test(el.tagName));
     return kinder.length ? kinder : [root];
   }
   function abbild(block) {

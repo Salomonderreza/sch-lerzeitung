@@ -214,7 +214,7 @@
   function sitzung(nr) {
     const def = KL.SITZUNGEN.find((s) => s.nr === nr);
     const sz = P.daten.sitzungen;
-    if (!sz[nr]) sz[nr] = neuerDurchgang();
+    if (!sz[nr]) { sz[nr] = neuerDurchgang(); if (def.vorbereiten) def.vorbereiten(P.daten.fs); }
     const R = sz[nr];
     R.beendet = null;
     KL.pruefung.setze(P.daten);

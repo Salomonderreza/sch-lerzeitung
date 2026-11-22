@@ -5,14 +5,14 @@ window.KL = window.KL || {};
 (() => {
   "use strict";
   const { esc } = KL.util;
-  const BAND = { fett: "Fett", kursiv: "Kursiv", unterstrichen: "Unterstrichen", groesser: "Schrift größer", kleiner: "Schrift kleiner", schriftgrad: "Schriftgrad", kopieren: "Kopieren", einfuegen: "Einfügen", ausschneiden: "Ausschneiden", undo: "Rückgängig", redo: "Wiederholen", speichern: "Speichern", links: "Linksbündig", zentriert: "Zentriert", rechts: "Rechtsbündig", rsgr: "Rechtschreibung und Grammatik" };
+  const BAND = { fett: "Fett", kursiv: "Kursiv", unterstrichen: "Unterstrichen", groesser: "Schrift größer", kleiner: "Schrift kleiner", schriftgrad: "Schriftgrad", kopieren: "Kopieren", einfuegen: "Einfügen", ausschneiden: "Ausschneiden", undo: "Rückgängig", redo: "Wiederholen", speichern: "Speichern", links: "Linksbündig", zentriert: "Zentriert", rechts: "Rechtsbündig", rsgr: "Rechtschreibung und Grammatik", nummerierung: "Nummerierung", aufzaehlung: "Aufzählungszeichen" };
   const NMN = { rueck: "Buchstabenweise gelöscht", zieh: "Einzelnes Wort mit der Maus markiert", band: "Kopieren/Einfügen über das Menüband" };
   KL.ohneHtml = (h) => String(h || "").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 
   // ---------- Arbeitsweise bewerten (0–100 Punkte) mit Feedback ----------
   // Bewertet wird nur, was eindeutig umständlich ist. Ein Teil ohne Daten
   // (z. B. nie etwas markiert) zählt nicht mit; die Gewichte werden verteilt.
-  const KURZ = { fett: "Strg+Umschalt+F", kursiv: "Strg+Umschalt+K", unterstrichen: "Strg+U", groesser: "Strg+Umschalt+>", kleiner: "Strg+<", kopieren: "Strg+C", einfuegen: "Strg+V", ausschneiden: "Strg+X", undo: "Strg+Z", redo: "Strg+Y", links: "Strg+L", zentriert: "Strg+E", rechts: "Strg+R", rsgr: "F7" };
+  const KURZ = { fett: "Strg+Umschalt+F", kursiv: "Strg+Umschalt+K", unterstrichen: "Strg+U", groesser: "Strg+Umschalt+>", kleiner: "Strg+<", kopieren: "Strg+C", einfuegen: "Strg+V", ausschneiden: "Strg+X", undo: "Strg+Z", redo: "Strg+Y", links: "Strg+L", zentriert: "Strg+E", rechts: "Strg+R", rsgr: "F7", aufzaehlung: "Strg+Umschalt+L" };
   KL.arbeitsweise = function (aw) {
     const mk = aw.markiert || {};
     const teile = [];

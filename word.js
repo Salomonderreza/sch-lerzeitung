@@ -58,6 +58,7 @@ KL.word = (() => {
     const btn = (cmd, inhalt, tip, kl) => `<button type="button" class="wd-tool${kl ? " " + kl : ""}" data-cmd="${cmd}" data-tip="${esc(tip)}" title="${esc(tip)}">${inhalt}</button>`;
     const gruppe = (titel, inhalt) => `<div class="wd-group"><div class="wd-gbody">${inhalt}</div><div class="wd-glabel">${titel}</div></div>`;
     const fake = (...n) => n.map((x) => `<span class="wd-tool off">${x}</span>`).join("");
+    const listenIcon = (num) => `<svg viewBox="0 0 18 16" width="18" height="16"><g fill="#234">${[3, 8, 13].map((y, i) => (num ? `<text x="0.5" y="${y + 2.4}" font-size="5.2" font-family="Arial" font-weight="bold">${i + 1}</text>` : `<circle cx="2.2" cy="${y}" r="1.3"/>`) + `<rect x="6" y="${y - 0.7}" width="11" height="1.4"/>`).join("")}</g></svg>`;
     const absatzIcon = (ah) => `<svg viewBox="0 0 16 16" width="16" height="16"><g fill="#234">${[12, 8, 12, 6].map((w, i) => `<rect x="${ah === "l" ? 2 : ah === "m" ? 8 - w / 2 : 14 - w}" y="${3 + i * 3}" width="${w}" height="1.4"/>`).join("")}</g></svg>`;
 
     host.innerHTML = `
@@ -76,7 +77,7 @@ KL.word = (() => {
             ${gruppe("Zwischenablage", `${btn("einfuegen", "📋<span>Einfügen</span>", "Einfügen (Strg+V)", "big")}<div class="wd-col">${btn("ausschneiden", "✂️ Ausschneiden", "Ausschneiden (Strg+X)")}${btn("kopieren", "⧉ Kopieren", "Kopieren (Strg+C)")}</div>`)}
             ${gruppe("Schriftart", `<div class="wd-col"><div class="wd-row"><span class="wr-font">Calibri (Textkörper)</span><select class="wr-groesse" title="Schriftgrad">${GR.map((g) => `<option value="${g}"${g === 11 ? " selected" : ""}>${g}</option>`).join("")}</select>${btn("groesser", "A<sup>▲</sup>", "Schriftgrad vergrößern (Strg+Umschalt+>)")}${btn("kleiner", "A<sup>▼</sup>", "Schriftgrad verkleinern (Strg+<)")}</div>
               <div class="wd-row">${btn("fett", "<b>F</b>", "Fett (Strg+Umschalt+F)", "fmt")}${btn("kursiv", "<i>K</i>", "Kursiv (Strg+Umschalt+K)", "fmt")}${btn("unterstrichen", "<u>U</u>", "Unterstrichen (Strg+Umschalt+U)", "fmt")}</div></div>`)}
-            ${gruppe("Absatz", `<div class="wd-row">${btn("links", absatzIcon("l"), "Linksbündig (Strg+L)", "ico")}${btn("zentriert", absatzIcon("m"), "Zentriert (Strg+E)", "ico")}${btn("rechts", absatzIcon("r"), "Rechtsbündig (Strg+R)", "ico")}</div>`)}
+            ${gruppe("Absatz", `<div class="wd-col"><div class="wd-row">${btn("aufzaehlung", listenIcon(false), "Aufzählungszeichen (Strg+Umschalt+L)", "ico")}${btn("nummerierung", listenIcon(true), "Nummerierung", "ico")}</div><div class="wd-row">${btn("links", absatzIcon("l"), "Linksbündig (Strg+L)", "ico")}${btn("zentriert", absatzIcon("m"), "Zentriert (Strg+E)", "ico")}${btn("rechts", absatzIcon("r"), "Rechtsbündig (Strg+R)", "ico")}</div></div>`)}
             ${gruppe("Formatvorlagen", `<div class="wd-row">${fake("Standard", "Kein Leerraum", "Überschrift 1")}</div>`)}
           </div>
           <div class="wd-panel" data-panel="pruefen" hidden>${gruppe("Dokumentprüfung", btn("rsgr", "<span class=\"wr-abc\">abc✓</span><span>Rechtschreibung<br>und Grammatik</span>", "Rechtschreibung und Grammatik prüfen (F7)", "big"))}${gruppe("Kommentare", fake("Neuer Kommentar"))}</div>
@@ -136,6 +137,22 @@ KL.word = (() => {
       r.setEnd(prev, prev.childNodes.length);
       s.removeAllRanges(); s.addRange(r);
     }
+    function autoListe() {
+      const s = window.getSelection();
+      if (!s.rangeCount || !s.isCollapsed || !ed.contains(s.anchorNode)) return false;
+      let blk = s.anchorNode;
+      while (blk && blk.parentNode !== ed) blk = blk.parentNode;
+      if (!blk || blk.nodeType !== 1 || blk.tagName !== "P") return false;
+      const vor = document.createRange(); vor.selectNodeContents(blk); vor.setEnd(s.anchorNode, s.anchorOffset);
+      const t = vor.toString();
+      const cmd = /^1[.)]$/.test(t) ? "insertOrderedList" : /^[-*•]$/.test(t) ? "insertUnorderedList" : null;
+      if (!cmd) return false;
+      s.removeAllRanges(); s.addRange(vor);
+      document.execCommand("delete");
+      exec(cmd);
+      T.zaehle("autoListe");
+      return true;
+    }
     function exec(cmd, wert) {
       ed.focus();
       auswahlKuerzen();
@@ -153,12 +170,32 @@ KL.word = (() => {
         el.removeAttribute("align");
         if (/^(left|center|right|justify)$/.test(a)) el.style.textAlign = a;
       });
-      ed.querySelectorAll("div").forEach((d) => {
-        if (!d.querySelector(":scope > p, :scope > div, :scope > h1, :scope > h2, :scope > h3")) return;
-        const ausr = d.style.textAlign;
-        [...d.childNodes].forEach((k) => { if (k.nodeType === 1 && ausr && !k.style.textAlign) k.style.textAlign = ausr; d.parentNode.insertBefore(k, d); });
-        d.remove();
-      });
+      // Hüllen auflösen: <div>/<p>, die selbst Absätze oder Listen enthalten
+      // (Chrome legt z. B. beim Nummerieren <p><ol>…</ol></p> an)
+      const BLOCK = /^(P|DIV|OL|UL|H1|H2|H3)$/;
+      const huellen = [...ed.querySelectorAll("div, p")].filter((d) => [...d.children].some((k) => BLOCK.test(k.tagName)));
+      if (huellen.length) {
+        const s = window.getSelection();
+        const merk = s.rangeCount && ed.contains(s.anchorNode) ? [s.anchorNode, s.anchorOffset, s.focusNode, s.focusOffset] : null;
+        huellen.reverse().forEach((d) => {
+          if (!d.parentNode) return;
+          const ausr = d.style.textAlign;
+          let lose = null;
+          [...d.childNodes].forEach((k) => {
+            if (k.nodeType === 1 && BLOCK.test(k.tagName)) {
+              lose = null;
+              if (ausr && !k.style.textAlign && /^(P|DIV|H\d)$/.test(k.tagName)) k.style.textAlign = ausr;
+              d.parentNode.insertBefore(k, d);
+            } else {
+              if (k.nodeType === 3 && !k.data.trim() && !lose) { k.remove(); return; }
+              if (!lose) { lose = document.createElement("p"); if (ausr) lose.style.textAlign = ausr; d.parentNode.insertBefore(lose, d); }
+              lose.appendChild(k);
+            }
+          });
+          d.remove();
+        });
+        if (merk && ed.contains(merk[0]) && ed.contains(merk[2])) { try { s.setBaseAndExtent(merk[0], merk[1], merk[2], merk[3]); } catch (e) { /* egal */ } }
+      }
       ed.querySelectorAll("[style]").forEach((el) => { if (!el.getAttribute("style").trim()) el.removeAttribute("style"); });
     }
     function aktuelleGroesse() {
@@ -394,6 +431,7 @@ KL.word = (() => {
         if ((lk === "f" && e.shiftKey) || lk === "b") { e.preventDefault(); exec("bold"); return; }
         if ((lk === "k" && e.shiftKey) || lk === "i") { e.preventDefault(); exec("italic"); return; }
         if ((lk === "u" && e.shiftKey) || (lk === "u" && !e.shiftKey)) { e.preventDefault(); exec("underline"); return; }
+        if (lk === "l" && e.shiftKey) { e.preventDefault(); exec("insertUnorderedList"); return; }
         if (k === ">" || k === "]" || (e.shiftKey && (k === "<" || e.code === "IntlBackslash"))) { e.preventDefault(); stufe(1); return; }
         if (k === "<" || k === "[") { e.preventDefault(); stufe(-1); return; }
         if (lk === "e") { e.preventDefault(); exec("justifyCenter"); return; }
@@ -426,6 +464,8 @@ KL.word = (() => {
 
       if (NAV.has(k) && e.shiftKey) { shiftMarkiert = true; return; }
       if (k === "Tab") { e.preventDefault(); document.execCommand("insertText", false, "\t"); return; }
+      // AutoFormat wie in Word: „1.“ bzw. „-“ am Absatzanfang + Leertaste → Liste
+      if (k === " " && !mod && autoListe()) { e.preventDefault(); T.tippen(1); return; }
       if (k.length === 1) { T.tippen(1); if (!leer) T.zaehle("ueberschrieben"); }
       if (k === "Enter") T.tippen(0);
     });
@@ -481,7 +521,7 @@ KL.word = (() => {
       status();
       o.pc.speichereZustand();
     }
-    ed.addEventListener("input", () => { if (ed.querySelector("font[size]")) schriftKorrigieren(); if (ed.querySelector("[align], div > p")) normalisieren(); geaendert(); pruefenBald(); });
+    ed.addEventListener("input", () => { if (ed.querySelector("font[size]")) schriftKorrigieren(); if (ed.querySelector("[align], div > p, p > p, p > ol, p > ul, p > div")) normalisieren(); geaendert(); pruefenBald(); });
     ed.addEventListener("drop", (e) => e.preventDefault());
     ed.addEventListener("dragstart", (e) => e.preventDefault());
     // Einfügen: app.js hat externe Inhalte bereits blockiert; hier nur
@@ -718,6 +758,8 @@ KL.word = (() => {
         case "kleiner": stufe(-1); break;
         case "links": exec("justifyLeft"); break;
         case "zentriert": exec("justifyCenter"); break;
+        case "nummerierung": exec("insertOrderedList"); break;
+        case "aufzaehlung": exec("insertUnorderedList"); break;
         case "rechts": exec("justifyRight"); break;
         case "undo": ed.focus(); document.execCommand("undo"); geaendert(); break;
         case "redo": ed.focus(); document.execCommand("redo"); geaendert(); break;

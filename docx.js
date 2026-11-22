@@ -87,7 +87,16 @@ window.KL = window.KL || {};
     };
     b.childNodes.forEach(lauf);
     const a = { center: "center", right: "right", justify: "both" }[ausrichtung(b)];
-    return `<w:p>${a ? `<w:pPr><w:jc w:val="${a}"/></w:pPr>` : ""}${runs.join("")}</w:p>`;
+    // Listenpunkt: Nummer bzw. Punkt voranstellen und einrücken
+    let ind = "";
+    if (b.tagName === "LI") {
+      const ol = b.parentElement && b.parentElement.tagName === "OL";
+      const nr = [...b.parentElement.children].filter((x) => x.tagName === "LI").indexOf(b) + 1;
+      runs.unshift(`<w:r><w:t xml:space="preserve">${ol ? nr + "." : "•"}</w:t></w:r><w:r><w:tab/></w:r>`);
+      ind = '<w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs><w:spacing w:after="60"/><w:ind w:left="720" w:hanging="360"/>';
+    }
+    const ppr = `${ind}${a ? `<w:jc w:val="${a}"/>` : ""}`;
+    return `<w:p>${ppr ? `<w:pPr>${ppr}</w:pPr>` : ""}${runs.join("")}</w:p>`;
   }
   function bloecke(box) {
     const out = [];
@@ -100,6 +109,7 @@ window.KL = window.KL || {};
       } else if (n.nodeType === 1 && /^(UL|OL|TABLE|TBODY|TR|TD)$/.test(n.tagName)) {
         lose = null; out.push(...bloecke(n));
       } else {
+        if (n.nodeType === 3 && !n.data.trim() && /^(UL|OL|TABLE|TBODY|TR)$/.test(box.tagName)) return;
         if (!lose) { lose = document.createElement("p"); box.insertBefore(lose, n); out.push(lose); }
         lose.appendChild(n);
       }
